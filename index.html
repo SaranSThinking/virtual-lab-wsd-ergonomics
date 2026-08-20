@@ -1,0 +1,2312 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Work System Design &amp; Ergonomics Virtual Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;600;700;800&family=Literata:ital,opsz,wght@0,18..144,400;0,18..144,500;0,18..144,600;1,18..144,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EEF0EC;
+    --panel: #E4E8E1;
+    --panel-2: #DBE0D6;
+    --ink: #1B2229;
+    --ink-muted: #5B6572;
+    --line: #C9D0C6;
+    --accent: #2B5C82;
+    --accent-ink: #F4F7F9;
+    --ws: #A6752C;
+    --ws-soft: #A6752C1F;
+    --erg: #1E7A6D;
+    --erg-soft: #1E7A6D1F;
+    --good: #2F8F5B;
+    --warn: #B8862B;
+    --danger: #B23A48;
+    --danger-soft: #B23A481A;
+    --shadow: 0 6px 20px rgba(27,34,41,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12171B; --panel: #1B2227; --panel-2: #222B31; --line: #2B343A;
+      --ink: #E7EBEA; --ink-muted: #96A3A8; --accent: #6FA8D6; --accent-ink: #0E1418;
+      --ws: #D99A46; --ws-soft: #D99A4626; --erg: #4FB8A6; --erg-soft: #4FB8A626;
+      --good: #4BB37B; --warn: #D9A94A; --danger: #E2727E; --danger-soft: #E2727E22;
+      --shadow: 0 8px 26px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12171B; --panel: #1B2227; --panel-2: #222B31; --line: #2B343A;
+    --ink: #E7EBEA; --ink-muted: #96A3A8; --accent: #6FA8D6; --accent-ink: #0E1418;
+    --ws: #D99A46; --ws-soft: #D99A4626; --erg: #4FB8A6; --erg-soft: #4FB8A626;
+    --good: #4BB37B; --warn: #D9A94A; --danger: #E2727E; --danger-soft: #E2727E22;
+    --shadow: 0 8px 26px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper); color: var(--ink); min-height: 100vh;
+    font-family: "Literata", Georgia, "Times New Roman", serif;
+    font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .display { font-family: "Big Shoulders Display", "Arial Narrow", sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; text-wrap: balance; color: var(--ink); }
+  .mono, .num, input, select, button, .badge, .side-no, .exp-no, .sec-tag { font-family: "IBM Plex Mono", Consolas, monospace; }
+  a { color: var(--accent); }
+  p { max-width: 68ch; }
+  ul, ol { max-width: 68ch; }
+  button { cursor: pointer; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; } }
+
+  /* ---- shell ---- */
+  #app-shell { display: flex; flex-direction: column; min-height: 100vh; }
+  .masthead {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 18px 28px; border-bottom: 2px solid var(--ink); background: var(--paper);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .masthead-id { display: flex; align-items: baseline; gap: 12px; }
+  .masthead-id .mark { font-family: "Big Shoulders Display", sans-serif; font-weight: 800; font-size: 1.35rem; letter-spacing: 0.02em; text-transform: uppercase; }
+  .masthead-id .mark a { color: var(--ink); text-decoration: none; }
+  .masthead-id .tag { font-size: 0.72rem; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .masthead-nav { display: flex; gap: 4px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .masthead-nav a { color: var(--ink-muted); text-decoration: none; padding: 8px 12px; border: 1px solid transparent; border-radius: 2px; }
+  .masthead-nav a:hover { color: var(--ink); border-color: var(--line); }
+  .masthead-nav a.on-ws { color: var(--ws); }
+  .masthead-nav a.on-erg { color: var(--erg); }
+
+  .body-grid { flex: 1; display: grid; grid-template-columns: 258px 1fr; align-items: start; }
+  @media (max-width: 860px) { .body-grid { grid-template-columns: 1fr; } .sidebar { display: none; } }
+
+  .sidebar { position: sticky; top: 61px; height: calc(100vh - 61px); overflow-y: auto; border-right: 1px solid var(--line); padding: 22px 18px 40px; }
+  .side-group { margin-bottom: 22px; }
+  .side-group-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-muted); font-weight: 600; padding: 0 8px 8px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+  .side-group.ws .side-group-label { color: var(--ws); border-color: var(--ws); }
+  .side-group.erg .side-group-label { color: var(--erg); border-color: var(--erg); }
+  .side-link { display: flex; align-items: baseline; gap: 8px; padding: 7px 8px; border-radius: 2px; text-decoration: none; color: var(--ink); font-size: 0.86rem; font-family: "Literata", serif; }
+  .side-link:hover { background: var(--panel); }
+  .side-link.active { background: var(--panel-2); font-weight: 600; }
+  .side-link .side-no { font-size: 0.68rem; color: var(--ink-muted); flex-shrink: 0; }
+
+  .main { padding: 34px 40px 90px; max-width: 980px; }
+  @media (max-width: 640px) { .main { padding: 24px 18px 70px; } }
+
+  /* ---- home ---- */
+  .hero { border-bottom: 1px solid var(--line); padding-bottom: 26px; margin-bottom: 30px; }
+  .hero .eyebrow { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-muted); margin-bottom: 10px; }
+  .hero h1 { font-size: clamp(2.1rem, 4.4vw, 3.1rem); margin: 0 0 14px; line-height: 1.02; }
+  .hero p.lede { font-size: 1.05rem; color: var(--ink-muted); max-width: 62ch; margin: 0; }
+  .info-card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 20px 22px; margin-bottom: 20px; }
+  .info-card h3 { font-size: 1rem; margin: 0 0 10px; text-transform: none; letter-spacing: 0; font-family: "Literata", serif; font-weight: 600; }
+  .info-card p, .info-card li { font-size: 0.92rem; color: var(--ink-muted); }
+  .info-card ul { margin: 8px 0 0; padding-left: 20px; }
+  .grounding-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 14px; }
+  .grounding-tile { border: 1px solid var(--line); border-radius: 2px; padding: 12px 14px; background: var(--paper); }
+  .grounding-tile .k { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+  .grounding-tile .v { font-size: 0.84rem; color: var(--ink); }
+
+  .track-section { margin: 34px 0 6px; }
+  .track-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  .track-head h2 { font-size: 1.6rem; margin: 0; }
+  .track-section.ws .track-head h2 { color: var(--ws); }
+  .track-section.erg .track-head h2 { color: var(--erg); }
+  .track-count { font-size: 0.78rem; color: var(--ink-muted); }
+  .track-blurb { color: var(--ink-muted); font-size: 0.92rem; max-width: 62ch; margin: 0 0 18px; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .exp-card { display: block; text-decoration: none; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 2px; padding: 16px 18px; transition: border-color 0.15s ease, transform 0.15s ease; }
+  .exp-card:hover { transform: translateY(-2px); }
+  .track-section.ws .exp-card { border-left-color: var(--ws); }
+  .track-section.erg .exp-card { border-left-color: var(--erg); }
+  .exp-card:hover { border-color: var(--ink-muted); }
+  .exp-card .no { font-size: 0.7rem; color: var(--ink-muted); display: block; margin-bottom: 6px; }
+  .exp-card h4 { margin: 0 0 8px; font-size: 1.06rem; text-transform: none; letter-spacing: 0; font-family: "Literata", serif; font-weight: 600; }
+  .exp-card p { margin: 0; font-size: 0.82rem; color: var(--ink-muted); }
+
+  /* ---- experiment page ---- */
+  .exp-crumb { font-size: 0.76rem; color: var(--ink-muted); margin-bottom: 14px; }
+  .exp-crumb a { text-decoration: none; }
+  .exp-titleblock { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 8px; }
+  .exp-no { font-size: 0.85rem; padding: 4px 9px; border-radius: 2px; font-weight: 600; }
+  .track-ws .exp-no { background: var(--ws-soft); color: var(--ws); }
+  .track-erg .exp-no { background: var(--erg-soft); color: var(--erg); }
+  .exp-titleblock h1 { font-size: clamp(1.7rem, 3.4vw, 2.5rem); margin: 0; }
+
+  .exp-section { padding: 26px 0; border-bottom: 1px solid var(--line); }
+  .exp-section:last-of-type { border-bottom: none; }
+  .exp-section h2 { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; margin: 0 0 14px; }
+  .sec-tag { font-size: 0.7rem; color: var(--ink-muted); border: 1px solid var(--line); border-radius: 2px; padding: 2px 7px; }
+  .exp-section p, .exp-section li { color: var(--ink); }
+  .exp-section .note { color: var(--ink-muted); font-size: 0.86rem; }
+  .procedure-list { padding-left: 22px; }
+  .procedure-list li { margin-bottom: 8px; }
+  .ref-list { padding-left: 20px; font-size: 0.88rem; color: var(--ink-muted); }
+  .ref-list li { margin-bottom: 6px; }
+
+  .sim-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 22px; }
+  .sim-note { background: var(--panel-2); border-left: 3px solid var(--accent); border-radius: 0 2px 2px 0; padding: 10px 13px; font-size: 0.82rem; color: var(--ink-muted); margin-bottom: 16px; }
+  .sim-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
+  .sim-field { display: flex; flex-direction: column; gap: 5px; min-width: 130px; }
+  .sim-field.grow { flex: 1; }
+  .sim-field label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-muted); }
+  .sim-field input[type="text"], .sim-field input[type="number"], .sim-field select {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 2px; padding: 8px 10px; color: var(--ink); font-size: 0.88rem;
+  }
+  .sim-field input[type="range"] { accent-color: var(--accent); }
+  .sim-field .range-val { font-size: 0.8rem; color: var(--ink); }
+  .btn { font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; background: var(--accent); color: var(--accent-ink); border: none; border-radius: 2px; padding: 10px 16px; font-weight: 600; }
+  .btn:hover { filter: brightness(1.08); }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .btn.ghost:hover { border-color: var(--ink-muted); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  .sim-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+
+  .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 16px; }
+  .result-tile { background: var(--paper); border: 1px solid var(--line); border-radius: 2px; padding: 12px 14px; }
+  .result-tile .k { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-muted); }
+  .result-tile .v { font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 3px; }
+  .result-tile.hl .v { color: var(--accent); }
+
+  .badge { display: inline-block; font-size: 0.72rem; font-weight: 600; padding: 4px 10px; border-radius: 2px; }
+  .badge.good { background: color-mix(in srgb, var(--good) 16%, var(--paper)); color: var(--good); }
+  .badge.warn { background: color-mix(in srgb, var(--warn) 18%, var(--paper)); color: var(--warn); }
+  .badge.danger { background: var(--danger-soft); color: var(--danger); }
+
+  .sim-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 6px; }
+  .sim-table th, .sim-table td { border: 1px solid var(--line); padding: 6px 9px; text-align: left; }
+  .sim-table th { background: var(--panel-2); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+  .sim-table td.num, .sim-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .table-scroll { overflow-x: auto; }
+  .row-rm { background: transparent; border: 1px solid var(--line); color: var(--ink-muted); border-radius: 2px; width: 26px; height: 26px; font-size: 0.8rem; }
+
+  .canvas-wrap { background: var(--paper); border: 1px solid var(--line); border-radius: 2px; padding: 10px; margin-top: 12px; }
+  canvas { max-width: 100%; display: block; }
+
+  .quiz-q { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 16px 18px; margin-bottom: 14px; }
+  .quiz-stem { font-family: "Literata", serif; font-weight: 600; margin: 0 0 10px; }
+  .quiz-num { color: var(--accent); font-family: "IBM Plex Mono", monospace; margin-right: 4px; }
+  .quiz-opts { display: flex; flex-direction: column; gap: 8px; }
+  .quiz-opt { text-align: left; background: var(--paper); border: 1px solid var(--line); border-radius: 2px; padding: 9px 12px; font-size: 0.88rem; color: var(--ink); font-family: "Literata", serif; }
+  .quiz-opt:hover { border-color: var(--ink-muted); }
+  .quiz-q.answered .quiz-opt { cursor: default; }
+  .quiz-opt.correct { border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--paper)); }
+  .quiz-opt.wrong { border-color: var(--danger); background: var(--danger-soft); }
+  .quiz-feedback { margin: 10px 0 0; font-size: 0.85rem; color: var(--ink-muted); }
+
+  .exp-pagenav { display: flex; justify-content: space-between; gap: 16px; padding-top: 26px; }
+  .pagenav-link { text-decoration: none; color: var(--ink); font-size: 0.85rem; max-width: 40%; }
+  .pagenav-link span { display: block; font-size: 0.68rem; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; font-family: "IBM Plex Mono", monospace; }
+  .pagenav-link.next { text-align: right; margin-left: auto; }
+
+  .foot { border-top: 1px solid var(--line); padding: 22px 40px 40px; font-size: 0.78rem; color: var(--ink-muted); }
+  .mannequin-fig text { font-family: "IBM Plex Mono", monospace; }
+</style>
+
+<div id="app-shell">
+  <header class="masthead">
+    <div class="masthead-id">
+      <span class="mark"><a href="#/">WSD·ERG LAB</a></span>
+      <span class="tag">Virtual Industrial Engineering Laboratory &middot; Developed by Saranraj Ramachandran, DoIE, CEG, AU</span>
+    </div>
+    <nav class="masthead-nav" id="top-nav">
+      <a href="#/">Index</a>
+      <a href="#/track/ws">Work System Design</a>
+      <a href="#/track/erg">Ergonomics</a>
+    </nav>
+  </header>
+  <div class="body-grid">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main" id="main"></main>
+  </div>
+  <footer class="foot">
+    <p style="margin:0 0 10px; font-weight:600; color:var(--ink)">Developed by Saranraj Ramachandran, DoIE, CEG, AU</p>
+    <p style="margin:0">Built for Industrial Engineering coursework - syllabus-mapped to Anna University IE23301 (Work System Design) &amp; IE23401 (Applied Ergonomics), and cross-checked against ILO's <em>Introduction to Work Study</em> and standard human-factors references. Scoring simulators (RULA, REBA, OWAS, frequency multiplier in NIOSH) use simplified teaching models built on the official angle bands and action-level thresholds - cross-check borderline real assessments against the published worksheets cited in each experiment's References.</p>
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* ============================== helpers ============================== */
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const fmt = (n, d=2) => Number.isFinite(n) ? n.toFixed(d) : "-";
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+
+// inverse-normal CDF approximation (Acklam's algorithm) - percentile (0-100) -> z
+function zFromPercentile(p) {
+  const pr = clamp(p, 0.001, 99.999) / 100;
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+  const plow = 0.02425, phigh = 1 - plow;
+  let q, r, x;
+  if (pr < plow) { q = Math.sqrt(-2*Math.log(pr)); x = (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+  else if (pr <= phigh) { q = pr - 0.5; r = q*q; x = (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1); }
+  else { q = Math.sqrt(-2*Math.log(1-pr)); x = -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+  return x;
+}
+
+function renderQuiz(exp, container) {
+  container.innerHTML = exp.quiz.map((q, qi) => `
+    <div class="quiz-q" data-qi="${qi}">
+      <p class="quiz-stem"><span class="quiz-num">Q${qi+1}.</span>${q.q}</p>
+      <div class="quiz-opts">
+        ${q.options.map((opt, oi) => `<button type="button" class="quiz-opt" data-oi="${oi}">${String.fromCharCode(65+oi)}. ${opt}</button>`).join("")}
+      </div>
+      <p class="quiz-feedback" hidden></p>
+    </div>`).join("");
+  $$(".quiz-q", container).forEach(qEl => {
+    const qi = +qEl.dataset.qi, q = exp.quiz[qi];
+    $$(".quiz-opt", qEl).forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (qEl.classList.contains("answered")) return;
+        qEl.classList.add("answered");
+        const oi = +btn.dataset.oi;
+        $$(".quiz-opt", qEl).forEach((b, i) => {
+          if (i === q.correct) b.classList.add("correct");
+          else if (i === oi) b.classList.add("wrong");
+        });
+        const fb = $(".quiz-feedback", qEl);
+        fb.hidden = false;
+        fb.textContent = (oi === q.correct ? "Correct - " : "Not quite - ") + q.explain;
+      });
+    });
+  });
+}
+
+/* ============================== animation / apparatus helpers ============================== */
+let _activeTimers = [];
+function trackTimer(id) { _activeTimers.push(id); return id; }
+function clearAllTimers() { _activeTimers.forEach(id => { clearInterval(id); clearTimeout(id); cancelAnimationFrame(id); }); _activeTimers = []; }
+const prefersReducedMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function loopAnim(fn) {
+  if (prefersReducedMotion()) { fn(0); return; }
+  function step(t) { if (fn(t) === false) return; trackTimer(requestAnimationFrame(step)); }
+  trackTimer(requestAnimationFrame(step));
+}
+
+// Shared playback-speed control markup + reader, used by every Play/Run animation.
+function speedControlHTML(id, selected = "1") {
+  return `<div class="sim-field"><label>Playback speed</label><select id="${id}">
+    <option value="0.25"${selected==="0.25"?" selected":""}>0.25× - slow motion</option>
+    <option value="0.5"${selected==="0.5"?" selected":""}>0.5×</option>
+    <option value="1"${selected==="1"?" selected":""}>1× - normal</option>
+    <option value="2"${selected==="2"?" selected":""}>2×</option>
+    <option value="4"${selected==="4"?" selected":""}>4× - fast</option>
+  </select></div>`;
+}
+function getSpeed(root, id) { const el = root.querySelector("#"+id); return el ? (+el.value || 1) : 1; }
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function gaussianNoise(mean, sd) {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return mean + sd * Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+
+// Theoretical-vs-experimental comparison tiles, as in the standard vlab layout.
+function compareTiles(theoLabel, theoVal, expLabel, expVal, unit, decimals = 2) {
+  const pctErr = theoVal !== 0 ? Math.abs(expVal - theoVal) / Math.abs(theoVal) * 100 : 0;
+  const badge = pctErr < 5 ? "good" : pctErr < 15 ? "warn" : "danger";
+  return `
+    <div class="result-tile"><div class="k">${theoLabel} - theoretical</div><div class="v">${fmt(theoVal, decimals)} ${unit}</div></div>
+    <div class="result-tile"><div class="k">${expLabel} - experimental</div><div class="v">${fmt(expVal, decimals)} ${unit}</div></div>
+    <div class="result-tile"><div class="k">Agreement</div><div class="v"><span class="badge ${badge}">${fmt(pctErr,1)}% difference</span></div></div>`;
+}
+
+// Simple 2D profile stick figure - reused across the ergonomics posture experiments.
+// Angles are degrees; trunk 0 = upright, +ve = forward flexion; upperArm 0 = hanging at side, +ve = raised forward.
+function drawStickFigure(ctx, o) {
+  const { cx, cy, scale = 1, trunk = 0, neck = 0, upperArm = 0, lowerArm = 0, knee = 0, color = "#000", loadBox = false, legLift = 0 } = o;
+  const rad = d => d * Math.PI / 180;
+  const dir = a => ({ dx: Math.sin(rad(a)), dy: -Math.cos(rad(a)) });
+  const pt = (base, len, ang) => { const d = dir(ang); return { x: base.x + len*d.dx*scale, y: base.y + len*d.dy*scale }; };
+  const pelvis = { x: cx, y: cy };
+  const knee1 = pt(pelvis, 40, 180 + legLift);
+  const foot1 = pt(knee1, 38, 180 - knee + legLift);
+  const shoulder = pt(pelvis, 54, trunk);
+  const headBase = pt(shoulder, 16, trunk + neck);
+  const headC = pt(shoulder, 24, trunk + neck);
+  const armAng = trunk + 180 - upperArm;
+  const elbow = pt(shoulder, 30, armAng);
+  const lowArmAng = armAng - lowerArm;
+  const hand = pt(elbow, 26, lowArmAng);
+
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.beginPath(); ctx.moveTo(pelvis.x,pelvis.y); ctx.lineTo(knee1.x,knee1.y); ctx.lineTo(foot1.x,foot1.y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pelvis.x,pelvis.y); ctx.lineTo(shoulder.x,shoulder.y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(shoulder.x,shoulder.y); ctx.lineTo(headBase.x,headBase.y); ctx.stroke();
+  ctx.beginPath(); ctx.arc(headC.x, headC.y, 10*scale, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(shoulder.x,shoulder.y); ctx.lineTo(elbow.x,elbow.y); ctx.lineTo(hand.x,hand.y); ctx.stroke();
+  [pelvis,shoulder,elbow,knee1].forEach(p => { ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill(); });
+  if (loadBox) { ctx.strokeRect(hand.x-11, hand.y-8, 22, 18); }
+  ctx.fillStyle = color; ctx.strokeStyle = color;
+  return { pelvis, shoulder, elbow, hand, headC, knee: knee1, foot: foot1 };
+}
+
+// Draws one ASME/ILO process-chart symbol (O/I/T/D/S) as a bold vector glyph, not just text.
+function drawProcessSymbol(ctx, x, y, sym, color, size = 20) {
+  ctx.save();
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3;
+  if (sym === "O") { ctx.beginPath(); ctx.arc(x, y, size*0.5, 0, Math.PI*2); ctx.stroke(); }
+  else if (sym === "I") { ctx.strokeRect(x-size*0.45, y-size*0.45, size*0.9, size*0.9); }
+  else if (sym === "T") {
+    ctx.beginPath(); ctx.moveTo(x-size*0.5, y); ctx.lineTo(x+size*0.25, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+size*0.5, y); ctx.lineTo(x+size*0.15, y-size*0.28); ctx.lineTo(x+size*0.15, y+size*0.28); ctx.closePath(); ctx.fill();
+  } else if (sym === "D") {
+    ctx.beginPath(); ctx.moveTo(x-size*0.4, y-size*0.5); ctx.lineTo(x-size*0.4, y+size*0.5);
+    ctx.arc(x-size*0.4, y, size*0.5, Math.PI/2, -Math.PI/2, true); ctx.closePath(); ctx.stroke();
+  } else if (sym === "S") {
+    ctx.beginPath(); ctx.moveTo(x, y+size*0.5); ctx.lineTo(x-size*0.5, y-size*0.4); ctx.lineTo(x+size*0.5, y-size*0.4); ctx.closePath(); ctx.stroke();
+  }
+  ctx.restore();
+}
+const SYMBOL_NAME = { O: "Operation", I: "Inspection", T: "Transport", D: "Delay", S: "Storage" };
+const SYMBOL_COLOR_VAR = { O: "--good", I: "--accent", T: "--warn", D: "--danger", S: "--warn" };
+function colorVarForSym(sym) { return SYMBOL_COLOR_VAR[sym] || "--ink"; }
+
+function drawGroundLine(ctx, x0, x1, y) {
+  ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke();
+}
+
+// Small animated workbench scene for the Work Study experiments: a hand/arm moves a part
+// between marked zones on a repeating cycle. phaseFn(t) returns 0..1 progress through the cycle.
+function drawWorkbenchScene(ctx, w, h, progress, opts = {}) {
+  const { label = "", speed = 1, color } = opts;
+  ctx.clearRect(0,0,w,h);
+  const groundY = h - 34;
+  drawGroundLine(ctx, 20, w-20, groundY);
+  const benchY = groundY - 4;
+  ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(60, benchY); ctx.lineTo(w-60, benchY); ctx.stroke();
+  const zones = [{x:100,label:"Bin"},{x:w/2,label:"Fixture"},{x:w-100,label:"Output"}];
+  ctx.fillStyle = cssVar("--ink-muted"); ctx.font = "10px 'IBM Plex Mono'"; ctx.textAlign = "center";
+  zones.forEach(z => { ctx.beginPath(); ctx.arc(z.x, benchY, 4, 0, Math.PI*2); ctx.stroke(); ctx.fillText(z.label, z.x, benchY+22); });
+  // hand travels bin -> fixture -> output -> bin, ping-ponging over the cycle
+  const seg = progress < 0.5 ? progress/0.5 : 1 - (progress-0.5)/0.5;
+  const legPos = progress < 0.5 ? 0 : 1;
+  const from = zones[legPos].x, to = zones[legPos+1] ? zones[legPos+1].x : zones[0].x;
+  const handX = from + (to-from)*seg;
+  const lift = Math.sin(seg*Math.PI) * 22;
+  const handY = benchY - 8 - lift;
+  const c = color || cssVar("--ws");
+  ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 4; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(handX, benchY+40); ctx.lineTo(handX, handY); ctx.stroke();
+  ctx.beginPath(); ctx.arc(handX, handY, 7, 0, Math.PI*2); ctx.fill();
+  ctx.strokeRect(handX-6, handY-16, 12, 10);
+  ctx.textAlign = "left"; ctx.fillStyle = cssVar("--ink-muted");
+  if (label) ctx.fillText(label, 12, 16);
+}
+
+/* ============================== experiment data ============================== */
+const EXPERIMENTS = [];
+
+/* ---------- WS-01 Process Charts ---------- */
+EXPERIMENTS.push({
+  id: "process-charts", track: "ws", no: 1, title: "Method Study - Process Charts",
+  aim: "Record every step of a job as a sequence of standard chart symbols, so that non-value-adding steps (transports, delays, storages, inspections) become visible and can be attacked.",
+  theoryHTML: `
+    <p>Method study begins with <b>recording</b> the existing method exactly as it is performed, using the five standard process-chart symbols defined by ASME/ILO:</p>
+    <p><b>○</b> Operation - a step that changes, adds to, or prepares an item · <b>□</b> Inspection - a check for quality or quantity · <b>→</b> Transport - a movement of material, worker, or equipment · <b>D</b> Delay - a wait before the next planned step · <b>▽</b> Storage - controlled holding of an item.</p>
+    <p>An <b>outline process chart</b> records only Operations and Inspections, in the sequence they occur, and is used to get a first overview of a whole process. A <b>flow process chart</b> records all five symbols for one component, worker, or piece of equipment, and adds distance and time columns - it is the workhorse for spotting waste. A <b>two-handed process chart</b> records what the left hand and right hand each do, symbol by symbol, in parallel columns, at a single workplace - used to redesign a manual task for balance and rhythm between the hands.</p>`,
+  procedure: [
+    "Select the chart type: Outline, Flow, or Two-Handed.",
+    "Break the job into elements small enough that each is a single symbol.",
+    "For each element, choose the correct symbol and (for Flow charts) enter distance moved and time taken.",
+    "Add or remove rows until the recording matches the actual job as observed.",
+    "Read the automatically generated summary: count of each symbol, total distance travelled, total time.",
+    "Identify which Transports, Delays, and Storages could be eliminated, combined, or shortened - that is the start of the 'examine' stage of method study."
+  ],
+  simHTML: `
+    <div class="sim-note">A starter recording of "assembling a ballpoint pen" is preloaded. Edit it, or clear it and record your own job.</div>
+    <div class="canvas-wrap"><canvas id="pc-apparatus" width="760" height="180"></canvas></div>
+    <div class="sim-note" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <b>Symbol colour key:</b>
+      <span><span style="color:var(--good)">●</span> Operation - value-adding</span>
+      <span><span style="color:var(--accent)">■</span> Inspection - check</span>
+      <span><span style="color:var(--warn)">▲</span> Transport / Storage - necessary but non-value-adding</span>
+      <span><span style="color:var(--danger)">D</span> Delay - pure waste</span>
+    </div>
+    <div class="sim-row" style="align-items:flex-end">
+      <button class="btn" id="pc-play">▶ Play recording</button>
+      ${speedControlHTML("pc-speed")}
+      <span class="note" id="pc-playing-step" style="align-self:center"></span>
+    </div>
+    <div class="sim-row">
+      <div class="sim-field"><label>Chart type</label>
+        <select id="pc-type">
+          <option value="outline">Outline Process Chart</option>
+          <option value="flow" selected>Flow Process Chart</option>
+          <option value="twohand">Two-Handed Process Chart</option>
+        </select>
+      </div>
+      <div class="sim-field"><label>Job / component</label><input type="text" id="pc-job" value="Assembling a ballpoint pen"></div>
+    </div>
+    <div class="table-scroll"><table class="sim-table" id="pc-table"></table></div>
+    <div class="sim-actions"><button class="btn ghost" id="pc-add">+ Add step</button><button class="btn ghost" id="pc-reset">Reset to example</button></div>
+    <div class="result-grid" id="pc-summary"></div>
+  `,
+  simInit(root) {
+    const SYM = { O: "○ Operation", I: "□ Inspection", T: "→ Transport", D: "D Delay", S: "▽ Storage" };
+    const example = [
+      { desc: "Pick up pen barrel from bin", sym: "T", dist: 0.5, time: 0.05 },
+      { desc: "Inspect barrel for cracks", sym: "I", dist: 0, time: 0.03 },
+      { desc: "Insert ink refill into barrel", sym: "O", dist: 0, time: 0.08 },
+      { desc: "Carry sub-assembly to spring station", sym: "T", dist: 1.2, time: 0.06 },
+      { desc: "Fit spring over refill", sym: "O", dist: 0, time: 0.06 },
+      { desc: "Wait for cap-press machine to free up", sym: "D", dist: 0, time: 0.20 },
+      { desc: "Press cap onto barrel", sym: "O", dist: 0, time: 0.07 },
+      { desc: "Inspect click mechanism", sym: "I", dist: 0, time: 0.05 },
+      { desc: "Place finished pen in output tray", sym: "S", dist: 0.8, time: 0.04 }
+    ];
+    const twohandExample = [
+      { l: "Reach for barrel", ls: "T", r: "Hold sub-assembly", rs: "H" },
+      { l: "Grasp barrel", ls: "O", r: "Hold sub-assembly", rs: "H" },
+      { l: "Position barrel in fixture", ls: "O", r: "Reach for refill", rs: "T" },
+      { l: "Hold barrel", ls: "H", r: "Insert refill", rs: "O" },
+      { l: "Reach for cap", ls: "T", r: "Hold sub-assembly", rs: "H" },
+      { l: "Press cap on", ls: "O", r: "Hold sub-assembly", rs: "H" }
+    ];
+    let state = { type: "flow", steps: example.map(s => ({...s})), th: twohandExample.map(s => ({...s})) };
+
+    function summaryFor(steps) {
+      const counts = { O: 0, I: 0, T: 0, D: 0, S: 0 };
+      let dist = 0, time = 0;
+      steps.forEach(s => { counts[s.sym] = (counts[s.sym]||0) + 1; dist += +s.dist || 0; time += +s.time || 0; });
+      return { counts, dist, time };
+    }
+
+    function drawFlowLike(includeDist) {
+      const t = root.querySelector("#pc-table");
+      t.innerHTML = `<thead><tr><th>#</th><th>Description</th><th>Symbol</th>${includeDist?'<th class="num">Dist (m)</th>':''}<th class="num">Time (min)</th><th></th></tr></thead>
+        <tbody>${state.steps.map((s,i) => `
+          <tr data-i="${i}">
+            <td>${i+1}</td>
+            <td><input type="text" class="pc-desc" value="${s.desc}"></td>
+            <td><select class="pc-sym">${Object.entries(SYM).map(([k,v]) => `<option value="${k}" ${s.sym===k?'selected':''}>${v}</option>`).join("")}</select></td>
+            ${includeDist?`<td class="num"><input type="number" step="0.1" class="pc-dist" value="${s.dist}" style="width:70px"></td>`:''}
+            <td class="num"><input type="number" step="0.01" class="pc-time" value="${s.time}" style="width:70px"></td>
+            <td><button class="row-rm" data-rm="${i}">×</button></td>
+          </tr>`).join("")}</tbody>`;
+      $$(".pc-desc", t).forEach((el,i) => el.addEventListener("input", e => { state.steps[i].desc = e.target.value; }));
+      $$(".pc-sym", t).forEach((el,i) => el.addEventListener("change", e => { state.steps[i].sym = e.target.value; renderSummary(); }));
+      if (includeDist) $$(".pc-dist", t).forEach((el,i) => el.addEventListener("input", e => { state.steps[i].dist = +e.target.value; renderSummary(); }));
+      $$(".pc-time", t).forEach((el,i) => el.addEventListener("input", e => { state.steps[i].time = +e.target.value; renderSummary(); }));
+      $$(".row-rm", t).forEach(btn => btn.addEventListener("click", e => { state.steps.splice(+e.target.dataset.rm,1); draw(); }));
+    }
+
+    function drawTwohand() {
+      const t = root.querySelector("#pc-table");
+      const opts = k => `<option value="O" ${k==="O"?"selected":""}>○ Operate</option><option value="T" ${k==="T"?"selected":""}>→ Transport</option><option value="H" ${k==="H"?"selected":""}>H Hold</option><option value="D" ${k==="D"?"selected":""}>D Delay</option>`;
+      t.innerHTML = `<thead><tr><th>#</th><th>Left hand</th><th>Symbol</th><th>Symbol</th><th>Right hand</th><th></th></tr></thead>
+        <tbody>${state.th.map((s,i) => `
+          <tr>
+            <td>${i+1}</td>
+            <td><input type="text" class="th-l" value="${s.l}"></td>
+            <td><select class="th-ls">${opts(s.ls)}</select></td>
+            <td><select class="th-rs">${opts(s.rs)}</select></td>
+            <td><input type="text" class="th-r" value="${s.r}"></td>
+            <td><button class="row-rm" data-rm="${i}">×</button></td>
+          </tr>`).join("")}</tbody>`;
+      $$(".th-l", t).forEach((el,i) => el.addEventListener("input", e => state.th[i].l = e.target.value));
+      $$(".th-r", t).forEach((el,i) => el.addEventListener("input", e => state.th[i].r = e.target.value));
+      $$(".th-ls", t).forEach((el,i) => el.addEventListener("change", e => { state.th[i].ls = e.target.value; renderSummary(); }));
+      $$(".th-rs", t).forEach((el,i) => el.addEventListener("change", e => { state.th[i].rs = e.target.value; renderSummary(); }));
+      $$(".row-rm", t).forEach(btn => btn.addEventListener("click", e => { state.th.splice(+e.target.dataset.rm,1); draw(); }));
+    }
+
+    function renderSummary() {
+      const box = root.querySelector("#pc-summary");
+      if (state.type === "twohand") {
+        const lc = {}, rc = {};
+        state.th.forEach(s => { lc[s.ls]=(lc[s.ls]||0)+1; rc[s.rs]=(rc[s.rs]||0)+1; });
+        box.innerHTML = ["O","T","H","D"].map(k => `<div class="result-tile"><div class="k">${k} - Left / Right</div><div class="v">${lc[k]||0} / ${rc[k]||0}</div></div>`).join("");
+        return;
+      }
+      const { counts, dist, time } = summaryFor(state.steps);
+      const improvedTime = state.steps.filter(s => s.sym !== "D" && s.sym !== "S").reduce((a,s) => a + (+s.time||0), 0);
+      box.innerHTML = Object.entries(SYM).map(([k,v]) => `<div class="result-tile"><div class="k">${v}</div><div class="v">${counts[k]||0}</div></div>`).join("")
+        + `<div class="result-tile"><div class="k">Total distance</div><div class="v">${fmt(dist,1)} m</div></div>`
+        + compareTiles("Improved-method target (D &amp; S eliminated)", improvedTime, "Current recorded method", time, "min");
+    }
+
+    function drawApparatus(highlightIdx, bob) {
+      const cv = root.querySelector("#pc-apparatus"); if (!cv) return;
+      const ctx = cv.getContext("2d"), w = cv.width, h = cv.height;
+      ctx.clearRect(0,0,w,h);
+      const benchY = h - 60;
+      drawGroundLine(ctx, 20, w-20, h-30);
+      ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(60, benchY); ctx.lineTo(w-60, benchY); ctx.stroke();
+      const zones = [{x:120,label:"Bin"},{x:w/2,label:"Fixture"},{x:w-120,label:"Output"}];
+      ctx.fillStyle = cssVar("--ink-muted"); ctx.font = "10px 'IBM Plex Mono'"; ctx.textAlign = "center";
+      zones.forEach(z => { ctx.beginPath(); ctx.arc(z.x, benchY, 4, 0, Math.PI*2); ctx.stroke(); ctx.fillText(z.label, z.x, benchY+22); });
+      const steps = state.type === "twohand" ? [] : state.steps;
+      const s = highlightIdx != null ? steps[highlightIdx] : null;
+      const zoneIdx = !s ? 1 : (s.sym === "T" ? 0.5 : s.sym === "S" ? 2 : 1);
+      const handX = zoneIdx === 0.5 ? (zones[0].x+zones[1].x)/2 : zones[Math.round(zoneIdx)].x;
+      const lift = (bob||0) * 16;
+      const handY = benchY - 40 - lift;
+      const c = cssVar("--ws");
+      ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 4; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(handX, benchY); ctx.lineTo(handX, handY); ctx.stroke();
+      ctx.beginPath(); ctx.arc(handX, handY, 7, 0, Math.PI*2); ctx.fill();
+      ctx.strokeRect(handX-6, handY-16, 12, 10);
+      if (s) {
+        const badgeY = handY - 44;
+        ctx.fillStyle = cssVar("--panel-2"); ctx.strokeStyle = cssVar(colorVarForSym(s.sym)); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(handX, badgeY, 20, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        drawProcessSymbol(ctx, handX, badgeY, s.sym, cssVar(colorVarForSym(s.sym)), 22);
+        ctx.textAlign = "center"; ctx.fillStyle = cssVar("--ink"); ctx.font = "10px 'IBM Plex Mono'";
+        ctx.fillText(SYMBOL_NAME[s.sym], handX, badgeY-30);
+      }
+      ctx.textAlign = "left"; ctx.fillStyle = cssVar("--ink");
+      ctx.font = "11px 'IBM Plex Mono'";
+      ctx.fillText(s ? `[${s.sym}] ${s.desc}` : "Click Play to watch the recorded job run through the workbench", 12, 16);
+    }
+
+    function draw() {
+      state.type = root.querySelector("#pc-type").value;
+      if (state.type === "twohand") drawTwohand();
+      else drawFlowLike(state.type === "flow");
+      renderSummary();
+      drawApparatus(null);
+    }
+
+    root.querySelector("#pc-type").addEventListener("change", draw);
+    root.querySelector("#pc-add").addEventListener("click", () => {
+      if (state.type === "twohand") state.th.push({ l: "New left step", ls: "O", r: "New right step", rs: "O" });
+      else state.steps.push({ desc: "New step", sym: "O", dist: 0, time: 0.05 });
+      draw();
+    });
+    root.querySelector("#pc-reset").addEventListener("click", () => { state.steps = example.map(s=>({...s})); state.th = twohandExample.map(s=>({...s})); draw(); });
+    root.querySelector("#pc-play").addEventListener("click", () => {
+      if (state.type === "twohand" || !state.steps.length) return;
+      let i = 0;
+      const stepLbl = root.querySelector("#pc-playing-step");
+      function playStep() {
+        if (i >= state.steps.length) { stepLbl.textContent = "Recording complete."; drawApparatus(null); return; }
+        $$("tr", root.querySelector("#pc-table")).forEach(r => r.style.background = "");
+        const row = root.querySelector(`#pc-table tr[data-i="${i}"]`);
+        if (row) row.style.background = "var(--ws-soft)";
+        drawApparatus(i, 1);
+        stepLbl.textContent = `Playing step ${i+1} of ${state.steps.length}`;
+        i++;
+        trackTimer(setTimeout(playStep, 550 / getSpeed(root, "pc-speed")));
+      }
+      playStep();
+    });
+    draw();
+  },
+  quiz: [
+    { q: "Which chart records what each hand does, symbol by symbol, at a single workplace?", options: ["Outline process chart","Flow process chart","Two-handed process chart","Multiple activity chart"], correct: 2, explain: "The two-handed process chart is the tool for redesigning a manual, single-workplace task for balance and rhythm between the hands." },
+    { q: "A worker waiting for a machine to finish its cycle before loading the next part is recorded as which symbol?", options: ["○ Operation","D Delay","▽ Storage","□ Inspection"], correct: 1, explain: "An unplanned wait for the next step is a Delay (D); once controlled and authorised for holding, it would instead be a Storage (▽)." },
+    { q: "The first, most useful target when examining a flow process chart is usually to eliminate which symbol type?", options: ["Operations, since they add value","Transports and Delays, since they add no value","Inspections, since they slow the operator","Storages, since they use floor space"], correct: 1, explain: "Transport and Delay add time and distance without changing the product - method study's examine stage targets these first." }
+  ],
+  references: [
+    "Anna University IE23301 Work System Design - Unit 1, Method Study.",
+    "ILO, <i>Introduction to Work Study</i> (4th ed.), Ch. 6-9 - recording techniques.",
+    "Niebel &amp; Freivalds, <i>Methods, Standards, and Work Design</i> - process chart symbols (ASME standard)."
+  ]
+});
+
+/* ---------- WS-02 Motion Economy & Therbligs ---------- */
+EXPERIMENTS.push({
+  id: "motion-economy", track: "ws", no: 2, title: "Motion Study - Therbligs &amp; Motion Economy",
+  aim: "Break a manual task into Gilbreth's fundamental hand motions (therbligs), classify each as effective or ineffective, and apply the principles of motion economy to redesign the task.",
+  theoryHTML: `
+    <p>Frank and Lillian Gilbreth decomposed every manual task into 17 elemental hand motions called <b>therbligs</b>. Some are <b>effective</b> - they move the job forward: Reach, Move, Grasp, Position, Release, Assemble, Use. Others are <b>ineffective</b> - they consume time without advancing the job, and are the first target for redesign: Search, Select, Hold, Plan, Unavoidable Delay, Avoidable Delay, Rest.</p>
+    <p>The <b>principles of motion economy</b> group into three families: (1) use of the human body - both hands should start and finish motions together, motions should be smooth curved ones, not zig-zags with sudden changes of direction; (2) arrangement of the workplace - fixed locations for tools and materials, materials pre-positioned, gravity feed where possible; (3) design of tools and equipment - combine tools, pre-position for the next use, relieve the hand of holding wherever a jig or fixture can do it.</p>`,
+  procedure: [
+    "Read each recorded hand motion from the task below.",
+    "Classify it as the correct therblig from the dropdown.",
+    "Submit to check your classification against the observed-task key.",
+    "For every motion flagged ineffective, read which motion-economy principle it violates and the suggested redesign.",
+    "Note how many ineffective therbligs were found - that count is a rough index of how much the method can still be improved."
+  ],
+  simHTML: `
+    <div class="sim-note">Task: an assembler pulling a component from an unmarked mixed-parts bin, holding it while reading a spec sheet, then fitting it.</div>
+    <div class="canvas-wrap"><canvas id="me-apparatus" width="760" height="180"></canvas></div>
+    <div class="sim-row" style="align-items:flex-end"><button class="btn" id="me-play">▶ Play current-method cycle</button>${speedControlHTML("me-speed")}</div>
+    <div class="table-scroll"><table class="sim-table" id="me-table"></table></div>
+    <div class="sim-actions"><button class="btn" id="me-check">Check classification</button><button class="btn ghost" id="me-reset">Reset</button></div>
+    <div id="me-feedback"></div>
+    <div class="result-grid" id="me-compare"></div>
+  `,
+  simInit(root) {
+    const options = ["Search","Select","Grasp","Reach","Move","Hold","Position","Release","Inspect","Plan","Avoidable Delay","Unavoidable Delay","Rest"];
+    const items = [
+      { motion: "Eyes scan the mixed bin looking for the right part", key: "Search", effective: false, principle: "Fixed, marked locations for parts remove the need to search - use labelled bins.", sec: 1.4, zone: 0 },
+      { motion: "Hand picks out the correct part from among several similar ones", key: "Select", effective: false, principle: "Pre-sort or pre-kit parts so only one type is within reach at a time.", sec: 0.9, zone: 0 },
+      { motion: "Fingers close around the part", key: "Grasp", effective: true, principle: "Effective - an unavoidable part of picking anything up.", sec: 0.4, zone: 0 },
+      { motion: "Hand carries the part toward the fixture", key: "Move", effective: true, principle: "Effective - keep the path a smooth curve, not a zig-zag.", sec: 0.6, zone: 0.5 },
+      { motion: "Worker keeps the part steady in one hand while reading the spec sheet with the other", key: "Hold", effective: false, principle: "A simple jig or fixture should hold the part - freeing that hand to work.", sec: 2.1, zone: 1 },
+      { motion: "Worker pauses, unsure which orientation the spec sheet calls for", key: "Plan", effective: false, principle: "Move judgment decisions upstream, into method design - the operator should not have to plan mid-cycle.", sec: 1.6, zone: 1 },
+      { motion: "Part is aligned precisely into the fixture slot", key: "Position", effective: true, principle: "Effective - a chamfered or guided fixture can shorten this motion.", sec: 0.5, zone: 2 },
+      { motion: "Fingers open, letting go of the finished sub-assembly", key: "Release", effective: true, principle: "Effective - should be a quick, unhesitating drop, not a careful placement.", sec: 0.3, zone: 2 }
+    ];
+    function drawApparatus(activeIdx) {
+      const cv = root.querySelector("#me-apparatus"); if (!cv) return;
+      const ctx = cv.getContext("2d"), w = cv.width, h = cv.height, benchY = h - 60;
+      ctx.clearRect(0,0,w,h);
+      drawGroundLine(ctx, 20, w-20, h-30);
+      ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(60, benchY); ctx.lineTo(w-60, benchY); ctx.stroke();
+      const zones = [{x:120,label:"Parts bin"},{x:w/2,label:"Spec sheet"},{x:w-120,label:"Fixture"}];
+      ctx.fillStyle = cssVar("--ink-muted"); ctx.font = "10px 'IBM Plex Mono'"; ctx.textAlign = "center";
+      zones.forEach(z => { ctx.beginPath(); ctx.arc(z.x, benchY, 4, 0, Math.PI*2); ctx.stroke(); ctx.fillText(z.label, z.x, benchY+22); });
+      const it = activeIdx != null ? items[activeIdx] : null;
+      const zi = it ? it.zone : 0;
+      const handX = zi === 0.5 ? (zones[0].x+zones[1].x)/2 : zones[Math.round(zi)].x;
+      const handY = benchY - (it && !it.effective ? 56 : 40);
+      const c = it ? (it.effective ? cssVar("--good") : cssVar("--danger")) : cssVar("--ws");
+      ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 4; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(handX, benchY); ctx.lineTo(handX, handY); ctx.stroke();
+      ctx.beginPath(); ctx.arc(handX, handY, 7, 0, Math.PI*2); ctx.fill();
+      if (it) {
+        const badgeY = handY - 42;
+        ctx.fillStyle = cssVar("--panel-2"); ctx.strokeStyle = c; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(handX, badgeY, 18, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = c; ctx.font = "bold 20px 'IBM Plex Mono'"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(it.effective ? "✓" : "✗", handX, badgeY+1);
+        ctx.textBaseline = "alphabetic";
+        ctx.font = "10px 'IBM Plex Mono'"; ctx.fillStyle = cssVar("--ink");
+        ctx.fillText(it.key, handX, badgeY-26);
+      }
+      ctx.textAlign = "left"; ctx.fillStyle = cssVar("--ink"); ctx.font = "11px 'IBM Plex Mono'";
+      ctx.fillText(it ? `${it.key} - ${fmt(it.sec,1)}s ${it.effective ? "(effective)" : "(ineffective - wasted time)"}` : "Click Play to watch the current method's motion sequence", 12, 16);
+    }
+    function drawCompare() {
+      const experimental = items.reduce((a,it) => a + it.sec, 0);
+      const theoretical = items.filter(it => it.effective).reduce((a,it) => a + it.sec, 0);
+      root.querySelector("#me-compare").innerHTML = compareTiles("Redesigned-method target (ineffective motions removed)", theoretical, "Current-method cycle", experimental, "s", 1);
+    }
+    function draw() {
+      const t = root.querySelector("#me-table");
+      t.innerHTML = `<thead><tr><th>#</th><th>Observed motion</th><th>Classify as</th></tr></thead><tbody>
+        ${items.map((it,i) => `<tr><td>${i+1}</td><td>${it.motion}</td><td><select class="me-sel" data-i="${i}"><option value="">Choose…</option>${options.map(o=>`<option value="${o}">${o}</option>`).join("")}</select></td></tr>`).join("")}
+      </tbody>`;
+      drawApparatus(null);
+      drawCompare();
+    }
+    root.querySelector("#me-check").addEventListener("click", () => {
+      const fb = root.querySelector("#me-feedback");
+      let correct = 0, out = "";
+      $$(".me-sel", root).forEach((sel,i) => {
+        const it = items[i], ok = sel.value === it.key;
+        if (ok) correct++;
+        sel.style.borderColor = sel.value ? (ok ? "var(--good)" : "var(--danger)") : "var(--line)";
+        out += `<div class="result-tile" style="margin-bottom:8px"><div class="k">#${i+1} - correct answer: ${it.key} · ${it.effective ? '<span class="badge good">Effective</span>' : '<span class="badge warn">Ineffective</span>'}</div><div class="v" style="font-size:0.84rem;font-weight:400;font-family:'Literata',serif">${it.principle}</div></div>`;
+      });
+      fb.innerHTML = `<div class="result-grid" style="grid-template-columns:1fr;margin-top:16px"><div class="result-tile hl"><div class="k">Score</div><div class="v">${correct} / ${items.length} correctly classified</div></div></div>${out}`;
+    });
+    root.querySelector("#me-reset").addEventListener("click", () => { draw(); root.querySelector("#me-feedback").innerHTML = ""; });
+    root.querySelector("#me-play").addEventListener("click", () => {
+      let i = 0;
+      function step() {
+        if (i >= items.length) { drawApparatus(null); return; }
+        drawApparatus(i);
+        i++;
+        trackTimer(setTimeout(step, 500 / getSpeed(root, "me-speed")));
+      }
+      step();
+    });
+    draw();
+  },
+  quiz: [
+    { q: "Which of these is an ineffective therblig that redesign should try to remove?", options: ["Grasp","Release","Search","Position"], correct: 2, explain: "Search adds no value; it is removed by giving every part a fixed, labelled location." },
+    { q: "'Both hands should begin and complete their motions at the same instant' is a principle from which family?", options: ["Use of the human body","Arrangement of the workplace","Design of tools and equipment","Work measurement"], correct: 0, explain: "Simultaneous, symmetrical hand motion is a body-use principle of motion economy." },
+    { q: "An operator holding a part steady with one hand so the other hand can work on it should usually be fixed by:", options: ["Training the operator to hold more efficiently","A jig or fixture that holds the part","Slowing the task down","Adding an inspection step"], correct: 1, explain: "Wherever possible, a jig, fixture, or foot-operated clamp should take over holding so both hands stay free for productive motions." }
+  ],
+  references: [
+    "Anna University IE23301 Work System Design - Unit 1, Motion Study.",
+    "Gilbreth &amp; Gilbreth (1924), origin of the 17 therbligs.",
+    "Niebel &amp; Freivalds, <i>Methods, Standards, and Work Design</i> - principles of motion economy."
+  ]
+});
+
+/* ---------- WS-03 Time Study & Performance Rating ---------- */
+EXPERIMENTS.push({
+  id: "time-study", track: "ws", no: 3, title: "Work Measurement - Time Study &amp; Performance Rating",
+  aim: "Derive the standard time for a task from a set of stopwatch cycle readings, a performance rating, and a personal/fatigue/delay allowance.",
+  theoryHTML: `
+    <p><b>Time study</b> (stopwatch technique) measures the time an operator actually takes over several cycles, then adjusts it because the observed operator was not necessarily working at a standard pace. The <b>Westinghouse system</b> rates the operator across four factors - Skill, Effort, Condition, Consistency - each scored against six standard levels from Poor to Superskill, giving a percentage adjustment.</p>
+    <p><b>Rating Factor</b> R = 1 + (ΣSkill+Effort+Condition+Consistency %). <b>Normal Time</b> NT = Mean Observed Time × R - this is what a standard-pace worker would take with no rest at all. Finally an <b>allowance</b> is added for personal needs, fatigue, and unavoidable delay, giving the <b>Standard Time</b> ST = NT × (1 + Allowance %) - the time against which the job is planned, costed, and incentive schemes are set.</p>`,
+  procedure: [
+    "Review the ten stopwatch cycle readings recorded for the task (already averaged for you).",
+    "Rate the operator's Skill, Effort, Condition, and Consistency using the Westinghouse dropdowns.",
+    "Read the computed Rating Factor and Normal Time.",
+    "Set the allowance percentage for personal needs, fatigue, and unavoidable delay.",
+    "Read the resulting Standard Time and the estimated output per 8-hour shift."
+  ],
+  simHTML: `
+    <div class="sim-note">Ten observed cycle times (minutes) for a single-element packing task - the theoretical dataset. Run your own stopwatch trials below to build an independent experimental sample.</div>
+    <div class="canvas-wrap"><canvas id="ts-apparatus" width="760" height="200"></canvas></div>
+    <div class="sim-row" style="align-items:flex-end">
+      <button class="btn" id="ts-run">▶ Run stopwatch trial</button>
+      ${speedControlHTML("ts-speed")}
+      <span class="note" id="ts-run-status" style="align-self:center"></span>
+    </div>
+    <div class="table-scroll"><table class="sim-table" id="ts-obs"></table></div>
+    <div class="table-scroll" id="ts-trials-wrap" style="margin-top:10px"></div>
+    <div class="sim-row" style="margin-top:16px">
+      <div class="sim-field"><label>Skill</label><select id="ts-skill"></select></div>
+      <div class="sim-field"><label>Effort</label><select id="ts-effort"></select></div>
+      <div class="sim-field"><label>Condition</label><select id="ts-cond"></select></div>
+      <div class="sim-field"><label>Consistency</label><select id="ts-consist"></select></div>
+    </div>
+    <div class="sim-row">
+      <div class="sim-field grow"><label>Allowance - personal / fatigue / delay: <span id="ts-allow-val" class="range-val">12%</span></label><input type="range" id="ts-allow" min="0" max="25" value="12"></div>
+    </div>
+    <div class="result-grid" id="ts-result"></div>
+    <div class="result-grid" id="ts-compare" style="margin-top:10px"></div>
+  `,
+  simInit(root) {
+    const readings = [0.42,0.39,0.45,0.41,0.50,0.38,0.43,0.40,0.44,0.41];
+    const mean = readings.reduce((a,b)=>a+b,0) / readings.length;
+    const sd = Math.sqrt(readings.reduce((a,r)=>a+(r-mean)**2,0) / readings.length);
+    root.querySelector("#ts-obs").innerHTML = `<thead><tr>${readings.map((_,i)=>`<th>Cyc ${i+1}</th>`).join("")}<th>Mean</th></tr></thead><tbody><tr>${readings.map(r=>`<td class="num">${fmt(r,2)}</td>`).join("")}<td class="num" style="font-weight:600">${fmt(mean,3)}</td></tr></tbody>`;
+    let trials = [];
+    const levels = {
+      skill: [["Superskill",0.15],["Excellent",0.11],["Good",0.06],["Average",0],["Fair",-0.05],["Poor",-0.16]],
+      effort: [["Excessive",0.13],["Excellent",0.10],["Good",0.05],["Average",0],["Fair",-0.04],["Poor",-0.12]],
+      cond: [["Ideal",0.06],["Excellent",0.04],["Good",0.02],["Average",0],["Fair",-0.03],["Poor",-0.07]],
+      consist: [["Perfect",0.04],["Excellent",0.03],["Good",0.01],["Average",0],["Fair",-0.02],["Poor",-0.04]]
+    };
+    function fillSelect(id, arr) { root.querySelector(id).innerHTML = arr.map(([n,v]) => `<option value="${v}" ${n==="Average"?"selected":""}>${n} (${v>=0?"+":""}${(v*100).toFixed(0)}%)</option>`).join(""); }
+    fillSelect("#ts-skill", levels.skill); fillSelect("#ts-effort", levels.effort); fillSelect("#ts-cond", levels.cond); fillSelect("#ts-consist", levels.consist);
+
+    function drawStopwatch(frac, running) {
+      const cv = root.querySelector("#ts-apparatus"); if (!cv) return;
+      const ctx = cv.getContext("2d"), w = cv.width, h = cv.height, cx = 150, cy = h/2, r = 60;
+      ctx.clearRect(0,0,w,h);
+      ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+      for (let i=0;i<12;i++) { const a=i*Math.PI/6; ctx.beginPath(); ctx.moveTo(cx+Math.sin(a)*(r-6), cy-Math.cos(a)*(r-6)); ctx.lineTo(cx+Math.sin(a)*r, cy-Math.cos(a)*r); ctx.stroke(); }
+      const a = frac*Math.PI*2;
+      ctx.strokeStyle = running ? cssVar("--ws") : cssVar("--ink-muted"); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.sin(a)*(r-10), cy-Math.cos(a)*(r-10)); ctx.stroke();
+      ctx.fillStyle = cssVar("--ink"); ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2); ctx.fill();
+      // packing hand scene to the right
+      const benchY = h - 46; drawGroundLine(ctx, 260, w-30, benchY+18);
+      ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(300,benchY); ctx.lineTo(w-60,benchY); ctx.stroke();
+      const zones=[{x:340,label:"Item"},{x:(340+w-100)/2,label:"Box"},{x:w-100,label:"Sealed"}];
+      ctx.fillStyle = cssVar("--ink-muted"); ctx.font="10px 'IBM Plex Mono'"; ctx.textAlign="center";
+      zones.forEach(z=>{ ctx.beginPath(); ctx.arc(z.x,benchY,4,0,Math.PI*2); ctx.stroke(); ctx.fillText(z.label,z.x,benchY+20); });
+      const seg = frac<0.5? frac/0.5 : 1-(frac-0.5)/0.5;
+      const legPos = frac<0.5?0:1;
+      const hx = zones[legPos].x + (zones[legPos+1].x-zones[legPos].x)*seg;
+      const hy = benchY - 10 - Math.sin(seg*Math.PI)*20;
+      ctx.strokeStyle = cssVar("--ws"); ctx.fillStyle = cssVar("--ws"); ctx.lineWidth=4; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(hx,benchY+30); ctx.lineTo(hx,hy); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx,hy,6,0,Math.PI*2); ctx.fill();
+      ctx.textAlign="left"; ctx.fillStyle=cssVar("--ink"); ctx.font="12px 'IBM Plex Mono'";
+      ctx.fillText(running ? "Timing…" : "Ready", cx-24, cy+r+22);
+    }
+    function drawTrials() {
+      const wrap = root.querySelector("#ts-trials-wrap");
+      if (!trials.length) { wrap.innerHTML = `<div class="sim-note">No experimental trials yet - click "Run stopwatch trial" to time a fresh cycle.</div>`; return; }
+      wrap.innerHTML = `<table class="sim-table"><thead><tr>${trials.map((_,i)=>`<th>Trial ${i+1}</th>`).join("")}<th>Mean</th></tr></thead><tbody><tr>${trials.map(t=>`<td class="num">${fmt(t,3)}</td>`).join("")}<td class="num" style="font-weight:600">${fmt(trials.reduce((a,b)=>a+b,0)/trials.length,3)}</td></tr></tbody></table>`;
+    }
+    function compute() {
+      const sum = ["#ts-skill","#ts-effort","#ts-cond","#ts-consist"].reduce((a,id) => a + (+root.querySelector(id).value), 0);
+      const R = 1 + sum;
+      const NT = mean * R;
+      const allow = +root.querySelector("#ts-allow").value;
+      root.querySelector("#ts-allow-val").textContent = allow + "%";
+      const ST = NT * (1 + allow/100);
+      const perShift = ST > 0 ? Math.floor(480 / ST) : 0;
+      root.querySelector("#ts-result").innerHTML = `
+        <div class="result-tile"><div class="k">Mean observed time (dataset)</div><div class="v">${fmt(mean,3)} min</div></div>
+        <div class="result-tile"><div class="k">Rating factor R</div><div class="v">${fmt(R,3)}</div></div>
+        <div class="result-tile"><div class="k">Normal time</div><div class="v">${fmt(NT,3)} min</div></div>
+        <div class="result-tile hl"><div class="k">Standard time (theoretical)</div><div class="v">${fmt(ST,3)} min</div></div>
+        <div class="result-tile"><div class="k">Output / 8-hr shift</div><div class="v">${perShift} pcs</div></div>`;
+      if (trials.length) {
+        const expMean = trials.reduce((a,b)=>a+b,0)/trials.length;
+        const expST = expMean * R * (1 + allow/100);
+        root.querySelector("#ts-compare").innerHTML = compareTiles("Standard time", ST, "Standard time", expST, "min", 3);
+      } else {
+        root.querySelector("#ts-compare").innerHTML = `<div class="result-tile" style="grid-column:1/-1"><div class="k">Experimental comparison</div><div class="v" style="font-size:0.9rem">Run at least one stopwatch trial to compare against the theoretical Standard Time.</div></div>`;
+      }
+    }
+    $$("#ts-skill,#ts-effort,#ts-cond,#ts-consist,#ts-allow", root).forEach(el => el.addEventListener("input", compute));
+    root.querySelector("#ts-run").addEventListener("click", () => {
+      const btn = root.querySelector("#ts-run"), status = root.querySelector("#ts-run-status");
+      btn.disabled = true; status.textContent = "Timing a fresh cycle…";
+      const start = performance.now(), dur = 1400;
+      let elapsedScaled = 0, lastT = start;
+      loopAnim(() => {
+        const now = performance.now(), dt = now - lastT; lastT = now;
+        elapsedScaled += dt * getSpeed(root, "ts-speed");
+        const frac = Math.min(elapsedScaled/dur, 1);
+        drawStopwatch(frac, frac < 1);
+        if (frac >= 1) {
+          const reading = Math.max(0.2, gaussianNoise(mean, sd));
+          trials.push(reading);
+          drawTrials(); compute(); drawStopwatch(0, false);
+          btn.disabled = false; status.textContent = `Captured ${fmt(reading,3)} min`;
+          return false;
+        }
+      });
+    });
+    drawStopwatch(0, false); drawTrials(); compute();
+  },
+  quiz: [
+    { q: "Normal Time is calculated as:", options: ["Mean observed time × allowance %","Mean observed time × rating factor","Mean observed time + allowance minutes","Mean observed time ÷ rating factor"], correct: 1, explain: "NT = Mean Observed Time × Rating Factor - it converts the observed pace to a standard pace." },
+    { q: "An operator rated 'Excellent' on Skill and 'Average' on the other three factors will have a Rating Factor:", options: ["Less than 1","Exactly 1","Greater than 1","Cannot be determined"], correct: 2, explain: "Excellent Skill contributes +0.11 with the rest at 0, so R = 1.11 > 1." },
+    { q: "Allowances for personal needs, fatigue, and unavoidable delay are added to convert:", options: ["Observed time to Normal time","Normal time to Standard time","Standard time to Observed time","Rating factor to Normal time"], correct: 1, explain: "ST = NT × (1 + Allowance %) accounts for rest and unavoidable interruptions a standard-pace worker still needs." }
+  ],
+  references: [
+    "Anna University IE23301 Work System Design - Unit 2, Work Measurement.",
+    "Lowry, Maynard &amp; Stegemerten (1940), the Westinghouse rating system.",
+    "ILO, <i>Introduction to Work Study</i> - time study and allowances."
+  ]
+});
+
+/* ---------- WS-04 Work Sampling ---------- */
+EXPERIMENTS.push({
+  id: "work-sampling", track: "ws", no: 4, title: "Work Sampling - Monte Carlo Simulation",
+  aim: "Estimate the proportion of a shift an operator spends Working, Idle, or Delayed by taking random instantaneous observations, and see how the estimate converges as sample size grows.",
+  theoryHTML: `
+    <p><b>Work sampling</b> estimates how time is split across activities by taking a large number of instantaneous observations at randomly chosen moments, instead of continuous stopwatch timing. It rests on the statistical fact that, over many random samples, the proportion of "working" observations converges to the true proportion of time spent working.</p>
+    <p>For a proportion p estimated from n observations, the 95% confidence interval is p ± 1.96·√(p(1−p)/n). To achieve a desired absolute error e, the required sample size is n = (1.96/e)²·p(1−p) - smaller desired error or a proportion closer to 50% both push n up sharply.</p>`,
+  procedure: [
+    "Click 'Take random observation' repeatedly - each click samples the (hidden) worker's true activity distribution at a random shift-time.",
+    "Watch the running tally and the convergence chart of estimated %Working.",
+    "After at least 30 observations, read the 95% confidence interval on %Working.",
+    "Use the desired-error slider to see how many total observations would be needed for a tighter estimate.",
+    "Reveal the true probabilities and compare them with your converged estimate."
+  ],
+  simHTML: `
+    <div class="sim-note">The true activity split is hidden until you reveal it - that mirrors a real work-sampling study, where you don't know the answer in advance.</div>
+    <div class="canvas-wrap"><canvas id="ws-apparatus" width="760" height="130"></canvas></div>
+    <div class="sim-actions">
+      <button class="btn" id="ws-obs">📷 Take random observation</button>
+      <button class="btn ghost" id="ws-obs10">Take 10 observations</button>
+      <button class="btn ghost" id="ws-reveal">Reveal true probabilities</button>
+      <button class="btn ghost" id="ws-reset">Reset</button>
+    </div>
+    <div class="canvas-wrap"><canvas id="ws-canvas" width="760" height="220"></canvas></div>
+    <div class="result-grid" id="ws-result"></div>
+    <div class="result-grid" id="ws-compare" style="margin-top:10px"></div>
+    <div class="sim-row" style="margin-top:16px">
+      <div class="sim-field grow"><label>Desired absolute error: <span id="ws-err-val" class="range-val">5%</span></label><input type="range" id="ws-err" min="1" max="15" value="5"></div>
+    </div>
+  `,
+  simInit(root) {
+    const truth = { Working: 0.72, Idle: 0.17, Delay: 0.11 };
+    const colors = { Working: "--good", Idle: "--danger", Delay: "--warn" };
+    let tally = { Working: 0, Idle: 0, Delay: 0 }, history = [], n = 0, revealed = false, lastState = null, flash = 0;
+
+    function drawApparatus() {
+      const cv = root.querySelector("#ws-apparatus"); if (!cv) return;
+      const ctx = cv.getContext("2d"), w = cv.width, h = cv.height;
+      ctx.clearRect(0,0,w,h);
+      if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash*0.5})`; ctx.fillRect(0,0,w,h); flash -= 0.15; }
+      const floorY = h - 26; drawGroundLine(ctx, 20, w-20, floorY);
+      const stations = 5, gap = (w-80)/(stations-1);
+      for (let i=0;i<stations;i++) {
+        const x = 40+i*gap;
+        ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x,floorY); ctx.lineTo(x,floorY-30); ctx.stroke();
+      }
+      const activeX = 40 + Math.floor(stations/2)*gap;
+      const c = lastState ? cssVar(colors[lastState]) : cssVar("--ink-muted");
+      ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 4; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(activeX, floorY); ctx.lineTo(activeX, floorY-34); ctx.stroke();
+      ctx.beginPath(); ctx.arc(activeX, floorY-40, 8, 0, Math.PI*2); ctx.fill();
+      ctx.textAlign = "center"; ctx.font = "11px 'IBM Plex Mono'"; ctx.fillStyle = cssVar("--ink");
+      ctx.fillText(lastState || "walk the floor and glance…", activeX, floorY+16);
+      ctx.textAlign = "left"; ctx.fillStyle = cssVar("--ink-muted");
+      ctx.fillText(`Observations so far: ${n}`, 12, 16);
+      if (flash > 0) trackTimer(requestAnimationFrame(drawApparatus));
+    }
+    function sampleOnce() {
+      const r = Math.random();
+      let state = r < truth.Working ? "Working" : (r < truth.Working + truth.Idle ? "Idle" : "Delay");
+      tally[state]++; n++;
+      history.push(tally.Working / n);
+      lastState = state; flash = 1; drawApparatus();
+    }
+    function drawChart() {
+      const cv = root.querySelector("#ws-canvas"), ctx = cv.getContext("2d");
+      ctx.clearRect(0,0,cv.width,cv.height);
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--line"); ctx.lineWidth = 1;
+      for (let g=0; g<=4; g++) { const y = 20 + g*(180/4); ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(740,y); ctx.stroke(); }
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--ink-muted");
+      ctx.font = "11px 'IBM Plex Mono'";
+      [0,25,50,75,100].reverse().forEach((v,i) => ctx.fillText(v+"%", 6, 24+i*45));
+      if (history.length > 1) {
+        ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--accent"); ctx.lineWidth = 2; ctx.beginPath();
+        history.forEach((p,i) => { const x = 40 + (i/(history.length-1))*700, y = 200 - p*180; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+        ctx.stroke();
+      }
+    }
+    function drawResult() {
+      const p = n ? tally.Working/n : 0;
+      const ci = n ? 1.96*Math.sqrt(p*(1-p)/n) : 0;
+      root.querySelector("#ws-result").innerHTML = `
+        <div class="result-tile"><div class="k">Observations taken</div><div class="v">${n}</div></div>
+        <div class="result-tile"><div class="k">Working</div><div class="v">${tally.Working}</div></div>
+        <div class="result-tile"><div class="k">Idle</div><div class="v">${tally.Idle}</div></div>
+        <div class="result-tile"><div class="k">Delay</div><div class="v">${tally.Delay}</div></div>
+        <div class="result-tile hl"><div class="k">Estimated % Working</div><div class="v">${n?fmt(p*100,1):"-"}%</div></div>
+        <div class="result-tile ${n>=30?"hl":""}"><div class="k">95% CI (n≥30 to trust)</div><div class="v">${n?"± "+fmt(ci*100,1)+"%":"-"}</div></div>`;
+      const e = (+root.querySelector("#ws-err").value)/100;
+      const nReq = p>0 && p<1 ? Math.ceil((1.96/e)**2 * p*(1-p)) : "-";
+      let box = root.querySelector("#ws-need");
+      root.querySelector("#ws-result").innerHTML += `<div class="result-tile"><div class="k">Obs. needed for ±${(e*100).toFixed(0)}%</div><div class="v">${nReq}</div></div>`;
+    }
+    function drawCompare() {
+      const box = root.querySelector("#ws-compare");
+      if (!revealed) { box.innerHTML = `<div class="result-tile" style="grid-column:1/-1"><div class="k">Theoretical vs experimental</div><div class="v" style="font-size:0.9rem">Reveal the true probabilities to compare against your sampled estimate.</div></div>`; return; }
+      const p = n ? tally.Working/n : 0;
+      box.innerHTML = compareTiles("%Working", truth.Working*100, "%Working", p*100, "%", 1);
+    }
+    root.querySelector("#ws-obs").addEventListener("click", () => { sampleOnce(); drawChart(); drawResult(); drawCompare(); });
+    root.querySelector("#ws-obs10").addEventListener("click", () => { for(let i=0;i<10;i++) sampleOnce(); drawChart(); drawResult(); drawCompare(); });
+    root.querySelector("#ws-err").addEventListener("input", e => { root.querySelector("#ws-err-val").textContent = e.target.value+"%"; drawResult(); });
+    root.querySelector("#ws-reveal").addEventListener("click", () => { revealed = true; drawCompare(); });
+    root.querySelector("#ws-reset").addEventListener("click", () => { tally = {Working:0,Idle:0,Delay:0}; history = []; n = 0; revealed = false; lastState = null; drawChart(); drawResult(); drawCompare(); drawApparatus(); });
+    drawApparatus(); drawChart(); drawResult(); drawCompare();
+  },
+  quiz: [
+    { q: "Work sampling estimates activity proportions using:", options: ["Continuous stopwatch timing of one cycle","A large number of instantaneous random observations","A single very long observation","Predetermined motion time tables"], correct: 1, explain: "It relies on many short, randomly-timed glances rather than continuous timing." },
+    { q: "If the true %Working is close to 50%, compared with it being close to 90%, the number of observations needed for a given precision is:", options: ["Smaller","The same","Larger","Undefined"], correct: 2, explain: "p(1−p) is maximised near p=0.5, so required sample size n=(1.96/e)²p(1−p) is largest there." },
+    { q: "Doubling the desired precision (halving the acceptable error e) roughly changes the required sample size by a factor of:", options: ["2","4","0.5","No change"], correct: 1, explain: "n ∝ 1/e², so halving e quadruples the required sample size." }
+  ],
+  references: [
+    "Anna University IE23301 Work System Design - Unit 2, Work Sampling.",
+    "Tippett, L.H.C. (1935), origin of work (ratio-delay) sampling.",
+    "Niebel &amp; Freivalds - sample size and confidence interval formulae."
+  ]
+});
+
+/* ---------- WS-05 Predetermined Motion Time Systems ---------- */
+EXPERIMENTS.push({
+  id: "pmts-mtm", track: "ws", no: 5, title: "Predetermined Motion Time - Basic MTM",
+  aim: "Build up a task's standard time from tabulated motion times (TMU) for elemental motions, without using a stopwatch at all.",
+  theoryHTML: `
+    <p><b>Predetermined Motion Time Systems (PMTS)</b> such as MTM (Methods-Time Measurement) assign a fixed time to every elemental hand motion, based on large-scale film-based studies. The unit is the <b>TMU (Time Measurement Unit)</b>, where 1 TMU = 0.00001 hour = 0.0006 minute = 0.036 second. Because the times are predetermined, a task's time can be estimated <i>before</i> it is ever performed - useful for costing a new product line or comparing two candidate methods without building either.</p>
+    <p>Every task is decomposed into basic motions: <b>Reach</b> (move the empty hand to a location), <b>Grasp</b> (close the fingers around an object), <b>Move</b> (transport a held object), <b>Position</b> (align an object precisely), and <b>Release</b> (let go). Each has its own time, which increases with distance moved and with the difficulty of the motion.</p>`,
+  procedure: [
+    "Click the motion buttons in the order they occur to build the method for a small assembly task.",
+    "Watch the TMU total accumulate, with each element's individually tabulated value.",
+    "Convert the total TMU to seconds and minutes.",
+    "Compare this predetermined time against the stopwatch-based Standard Time you computed in the Time Study experiment for a similar task."
+  ],
+  simHTML: `
+    <div class="sim-note">TMU table used (simplified MTM-1 excerpt): Reach 12in = 12.9, Reach 20in = 18.3 · Grasp (simple) = 2.0 · Move 12in = 11.4, Move 20in = 15.8 · Position (easy) = 5.6 · Release = 2.0. 1 TMU = 0.036 s.</div>
+    <div class="canvas-wrap"><canvas id="mtm-apparatus" width="760" height="150"></canvas></div>
+    <div class="sim-row" style="align-items:flex-end"><button class="btn" id="mtm-play">▶ Play built method</button>${speedControlHTML("mtm-speed")}</div>
+    <div class="sim-row">
+      <button class="btn ghost" data-add="reach12">+ Reach 12&quot;</button>
+      <button class="btn ghost" data-add="reach20">+ Reach 20&quot;</button>
+      <button class="btn ghost" data-add="grasp">+ Grasp</button>
+      <button class="btn ghost" data-add="move12">+ Move 12&quot;</button>
+      <button class="btn ghost" data-add="move20">+ Move 20&quot;</button>
+      <button class="btn ghost" data-add="position">+ Position</button>
+      <button class="btn ghost" data-add="release">+ Release</button>
+    </div>
+    <div class="table-scroll"><table class="sim-table" id="mtm-table"></table></div>
+    <div class="sim-actions"><button class="btn ghost" id="mtm-clear">Clear</button><button class="btn ghost" id="mtm-trial">⏱ Run stopwatch trial of this method</button></div>
+    <div class="result-grid" id="mtm-result"></div>
+    <div class="result-grid" id="mtm-compare" style="margin-top:10px"></div>
+  `,
+  simInit(root) {
+    const LIB = {
+      reach12: { name: "Reach 12in", tmu: 12.9 }, reach20: { name: "Reach 20in", tmu: 18.3 },
+      grasp: { name: "Grasp (simple)", tmu: 2.0 },
+      move12: { name: "Move 12in", tmu: 11.4 }, move20: { name: "Move 20in", tmu: 15.8 },
+      position: { name: "Position (easy fit)", tmu: 5.6 },
+      release: { name: "Release", tmu: 2.0 }
+    };
+    let seq = ["reach12","grasp","move12","position","release"];
+    let lastTheoSec = 0, trials = [];
+
+    function drawApparatus(activeIdx) {
+      const cv = root.querySelector("#mtm-apparatus"); if (!cv) return;
+      const ctx = cv.getContext("2d"), w = cv.width, h = cv.height, benchY = h - 50;
+      ctx.clearRect(0,0,w,h);
+      drawGroundLine(ctx, 20, w-20, h-24);
+      ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(40,benchY); ctx.lineTo(w-40,benchY); ctx.stroke();
+      if (!seq.length) { ctx.fillStyle = cssVar("--ink-muted"); ctx.font="11px 'IBM Plex Mono'"; ctx.fillText("Add motions to build the method", 16, 20); return; }
+      const n = seq.length, xs = seq.map((_,i) => 60 + (w-120)*(n===1?0:i/(n-1)));
+      ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 1;
+      xs.forEach((x,i) => { ctx.beginPath(); ctx.arc(x,benchY,4,0,Math.PI*2); ctx.stroke(); ctx.fillStyle = cssVar("--ink-muted"); ctx.font="9px 'IBM Plex Mono'"; ctx.textAlign="center"; ctx.fillText(LIB[seq[i]].name.split(" ")[0], x, benchY+18); });
+      const hx = activeIdx != null ? xs[activeIdx] : xs[0];
+      const hy = benchY - (activeIdx != null ? 34 : 18);
+      const c = cssVar("--ws");
+      ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.textAlign="left";
+      ctx.beginPath(); ctx.moveTo(hx,benchY); ctx.lineTo(hx,hy); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx,hy,6,0,Math.PI*2); ctx.fill();
+      if (activeIdx != null) {
+        const CODE = { reach12:"R", reach20:"R", grasp:"G", move12:"M", move20:"M", position:"P", release:"RL" };
+        const badgeY = hy - 40, code = CODE[seq[activeIdx]] || "?";
+        ctx.fillStyle = cssVar("--panel-2"); ctx.strokeStyle = c; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(hx, badgeY, 18, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = c; ctx.font = "bold 14px 'IBM Plex Mono'"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(code, hx, badgeY+1);
+        ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+      }
+      ctx.fillStyle = cssVar("--ink"); ctx.font="11px 'IBM Plex Mono'";
+      ctx.fillText(activeIdx != null ? `${LIB[seq[activeIdx]].name} - ${fmt(LIB[seq[activeIdx]].tmu,1)} TMU` : "Ready", 12, 16);
+    }
+    function drawTrials() {
+      const box = root.querySelector("#mtm-compare");
+      if (!trials.length) { box.innerHTML = `<div class="result-tile" style="grid-column:1/-1"><div class="k">Experimental comparison</div><div class="v" style="font-size:0.9rem">Run a stopwatch trial of this built method to compare measured time against the predetermined time.</div></div>`; return; }
+      const expMean = trials.reduce((a,b)=>a+b,0)/trials.length;
+      box.innerHTML = compareTiles("Method time", lastTheoSec, "Method time", expMean, "s", 2);
+    }
+    function draw() {
+      const t = root.querySelector("#mtm-table");
+      t.innerHTML = `<thead><tr><th>#</th><th>Motion</th><th class="num">TMU</th><th></th></tr></thead><tbody>
+        ${seq.map((k,i) => `<tr><td>${i+1}</td><td>${LIB[k].name}</td><td class="num">${fmt(LIB[k].tmu,1)}</td><td><button class="row-rm" data-rm="${i}">×</button></td></tr>`).join("")}
+      </tbody>`;
+      $$(".row-rm", t).forEach(b => b.addEventListener("click", e => { seq.splice(+e.target.dataset.rm,1); trials=[]; draw(); }));
+      const totalTMU = seq.reduce((a,k) => a + LIB[k].tmu, 0);
+      const sec = totalTMU * 0.036, min = sec/60;
+      lastTheoSec = sec;
+      root.querySelector("#mtm-result").innerHTML = `
+        <div class="result-tile hl"><div class="k">Total TMU</div><div class="v">${fmt(totalTMU,1)}</div></div>
+        <div class="result-tile hl"><div class="k">Predetermined time</div><div class="v">${fmt(sec,2)} s</div></div>
+        <div class="result-tile"><div class="k">In minutes</div><div class="v">${fmt(min,4)} min</div></div>`;
+      drawApparatus(null);
+      drawTrials();
+    }
+    $$("[data-add]", root).forEach(btn => btn.addEventListener("click", () => { seq.push(btn.dataset.add); trials=[]; draw(); }));
+    root.querySelector("#mtm-clear").addEventListener("click", () => { seq = []; trials=[]; draw(); });
+    root.querySelector("#mtm-play").addEventListener("click", () => {
+      if (!seq.length) return;
+      let i = 0;
+      function step() { if (i>=seq.length) { drawApparatus(null); return; } drawApparatus(i); i++; trackTimer(setTimeout(step, 450 / getSpeed(root, "mtm-speed"))); }
+      step();
+    });
+    root.querySelector("#mtm-trial").addEventListener("click", () => {
+      if (!seq.length) return;
+      const reading = Math.max(0.1, gaussianNoise(lastTheoSec, lastTheoSec*0.09));
+      trials.push(reading);
+      drawTrials();
+    });
+    draw();
+  },
+  quiz: [
+    { q: "1 TMU equals:", options: ["0.036 second","0.36 second","0.6 second","1 second"], correct: 0, explain: "1 TMU = 0.00001 hour = 0.036 second." },
+    { q: "The main practical advantage of a predetermined motion time system over stopwatch time study is:", options: ["It rates the operator's skill more accurately","It can estimate a task's time before the task is ever performed","It requires no analyst training","It automatically improves the method"], correct: 1, explain: "Because motion times are pre-tabulated, PMTS can cost a method that doesn't exist yet - useful at the design stage." },
+    { q: "In MTM, which elemental motion is used to describe aligning an object precisely into a fitting?", options: ["Reach","Grasp","Position","Release"], correct: 2, explain: "Position covers orienting and aligning a held object, and its time increases with the tightness of the required fit." }
+  ],
+  references: [
+    "Anna University IE23301 Work System Design - Unit 2, Predetermined Motion Time Systems.",
+    "Maynard, Stegemerten &amp; Schwab (1948), <i>Methods-Time Measurement</i>.",
+    "Niebel &amp; Freivalds - MTM-1 data tables (simplified excerpt used here)."
+  ]
+});
+
+/* ---------- WS-06 Assembly Line Balancing ---------- */
+EXPERIMENTS.push({
+  id: "line-balancing", track: "ws", no: 6, title: "Assembly Line Balancing",
+  aim: "Assign a fixed set of precedence-linked tasks to workstations under a target cycle time, and evaluate the resulting balance efficiency.",
+  theoryHTML: `
+    <p><b>Line balancing</b> assigns each task in an assembly to a workstation so that (a) precedence relationships are respected - a task cannot start before its predecessors are done - and (b) no station's total task time exceeds the chosen <b>cycle time C</b>, the time available at each station before the line moves on.</p>
+    <p>The <b>theoretical minimum number of stations</b> is N<sub>min</sub> = ⌈ΣT<sub>i</sub> / C⌉, where ΣT<sub>i</sub> is the sum of all task times. In practice more stations are usually needed. <b>Balance efficiency</b> = ΣT<sub>i</sub> / (N<sub>actual</sub> × C); <b>balance delay</b> = 1 − efficiency, the fraction of paid station-time that is idle.</p>`,
+  procedure: [
+    "Study the precedence network and task times below.",
+    "Choose a cycle time using the slider (it must be ≥ the longest single task).",
+    "Click ready tasks (those whose predecessors are already assigned) to add them to the current station.",
+    "Click 'New station' once a station is full or you choose to stop adding to it.",
+    "When all tasks are assigned, read the number of stations used and the balance efficiency.",
+    "Try 'Auto-balance' to see a heuristic (largest-candidate-rule) solution for comparison."
+  ],
+  simHTML: `
+    <div class="sim-note">8 tasks - precedence: 2,3 depend on 1 · 4 depends on 2 · 5 depends on 3 · 6 depends on 4,5 · 7 depends on 6 · 8 depends on 6.</div>
+    <div class="canvas-wrap"><canvas id="lb-apparatus" width="760" height="150"></canvas></div>
+    <div class="table-scroll"><table class="sim-table" id="lb-tasks"></table></div>
+    <div class="sim-row" style="margin-top:14px"><div class="sim-field grow"><label>Cycle time C: <span id="lb-c-val" class="range-val"></span></label><input type="range" id="lb-c" min="20" max="60" value="35"></div></div>
+    <div class="sim-actions"><button class="btn ghost" id="lb-newstation">+ New station</button><button class="btn ghost" id="lb-auto">Auto-balance (largest candidate rule)</button><button class="btn ghost" id="lb-reset">Reset</button></div>
+    <div id="lb-stations"></div>
+    <div class="result-grid" id="lb-result"></div>
+    <div class="result-grid" id="lb-compare" style="margin-top:10px"></div>
+  `,
+  simInit(root) {
+    const TASKS = { 1:{t:20,pred:[]}, 2:{t:15,pred:[1]}, 3:{t:18,pred:[1]}, 4:{t:12,pred:[2]}, 5:{t:22,pred:[3]}, 6:{t:14,pred:[4,5]}, 7:{t:10,pred:[6]}, 8:{t:16,pred:[6]} };
+    const totalT = Object.values(TASKS).reduce((a,x)=>a+x.t,0);
+    let stations = [[]], assigned = new Set();
+
+    function ready() { return Object.keys(TASKS).map(Number).filter(id => !assigned.has(id) && TASKS[id].pred.every(p=>assigned.has(p))); }
+    function C() { return +root.querySelector("#lb-c").value; }
+    function stationTime(st) { return st.reduce((a,id)=>a+TASKS[id].t,0); }
+
+    function drawTasks() {
+      root.querySelector("#lb-tasks").innerHTML = `<thead><tr><th>Task</th><th class="num">Time (s)</th><th>Predecessors</th></tr></thead><tbody>
+        ${Object.entries(TASKS).map(([id,x]) => `<tr><td>${id}</td><td class="num">${x.t}</td><td>${x.pred.join(", ")||"-"}</td></tr>`).join("")}
+      </tbody>`;
+    }
+    function drawApparatus() {
+      const cv = root.querySelector("#lb-apparatus"); if (!cv) return;
+      const ctx = cv.getContext("2d"), w = cv.width, h = cv.height, beltY = h - 50;
+      ctx.clearRect(0,0,w,h);
+      ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(40,beltY); ctx.lineTo(w-40,beltY); ctx.stroke();
+      const live = stations.filter(s=>s.length).length || 1;
+      const slots = Math.max(live, 4);
+      const gap = (w-100)/slots;
+      for (let i=0;i<slots;i++) {
+        const x = 60+i*gap+gap/2;
+        const filled = i < stations.length && stations[i].length;
+        ctx.strokeStyle = filled ? cssVar("--ws") : cssVar("--line"); ctx.fillStyle = filled ? cssVar("--ws-soft") : "transparent"; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.rect(x-24, beltY-30, 48, 30); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = cssVar("--ink-muted"); ctx.font="10px 'IBM Plex Mono'"; ctx.textAlign="center";
+        ctx.fillText(`ST ${i+1}`, x, beltY+16);
+        if (filled) { ctx.fillStyle = cssVar("--ink"); ctx.fillText(stations[i].map(id=>"T"+id).join(","), x, beltY-12); }
+      }
+      ctx.textAlign="left"; ctx.fillStyle = cssVar("--ink-muted"); ctx.font="11px 'IBM Plex Mono'";
+      ctx.fillText(`${assigned.size} / ${Object.keys(TASKS).length} tasks assigned`, 12, 16);
+    }
+    function drawStations() {
+      const rdy = ready(), c = C();
+      let html = stations.map((st,si) => {
+        const t = stationTime(st);
+        return `<div class="result-tile" style="margin-bottom:8px"><div class="k">Station ${si+1} - ${fmt(t,0)}/${c}s</div><div class="v" style="font-size:0.9rem;font-family:'Literata',serif;font-weight:400">${st.length?st.map(id=>`T${id}`).join(", "):"empty"}</div></div>`;
+      }).join("");
+      html += `<div class="sim-row" style="margin-top:10px">${rdy.map(id => {
+        const cur = stations[stations.length-1], fits = stationTime(cur)+TASKS[id].t <= c;
+        const titleAttr = fits ? "" : ` title="Won&#39;t fit in current station &mdash; start a new station"`;
+        return `<button class="btn ${fits?"":"ghost"}" data-assign="${id}" ${fits?"":"disabled"}${titleAttr}>Add T${id} (${TASKS[id].t}s)</button>`;
+      }).join("")}</div>`;
+      if (!rdy.length && assigned.size === Object.keys(TASKS).length) html += `<div class="badge good" style="margin-top:10px">All tasks assigned</div>`;
+      root.querySelector("#lb-stations").innerHTML = html;
+      $$("[data-assign]", root).forEach(b => b.addEventListener("click", () => { stations[stations.length-1].push(+b.dataset.assign); assigned.add(+b.dataset.assign); drawStations(); drawResult(); }));
+    }
+    function drawResult() {
+      const c = C(), n = stations.filter(s=>s.length).length || 1;
+      const nMin = Math.ceil(totalT / c);
+      const done = assigned.size === Object.keys(TASKS).length;
+      const eff = totalT / (n * c);
+      root.querySelector("#lb-result").innerHTML = `
+        <div class="result-tile"><div class="k">Total task time</div><div class="v">${totalT}s</div></div>
+        <div class="result-tile"><div class="k">Theoretical min. stations</div><div class="v">${nMin}</div></div>
+        <div class="result-tile"><div class="k">Stations used</div><div class="v">${n}</div></div>
+        <div class="result-tile ${done?"hl":""}"><div class="k">Balance efficiency</div><div class="v">${done?fmt(eff*100,1)+"%":"- assign all tasks"}</div></div>
+        <div class="result-tile"><div class="k">Balance delay</div><div class="v">${done?fmt((1-eff)*100,1)+"%":"-"}</div></div>`;
+      const compareBox = root.querySelector("#lb-compare");
+      if (done) {
+        const theoEff = totalT / (nMin * c) * 100;
+        compareBox.innerHTML = compareTiles("Efficiency at minimum stations", theoEff, "Efficiency of your assignment", eff*100, "%", 1);
+      } else {
+        compareBox.innerHTML = `<div class="result-tile" style="grid-column:1/-1"><div class="k">Theoretical vs experimental</div><div class="v" style="font-size:0.9rem">Assign every task to compare your line's efficiency against the theoretical best (using the minimum station count).</div></div>`;
+      }
+      drawApparatus();
+    }
+    root.querySelector("#lb-c").addEventListener("input", () => { root.querySelector("#lb-c-val").textContent = C()+"s"; drawStations(); drawResult(); });
+    root.querySelector("#lb-newstation").addEventListener("click", () => { stations.push([]); drawStations(); drawApparatus(); });
+    root.querySelector("#lb-reset").addEventListener("click", () => { stations = [[]]; assigned = new Set(); drawStations(); drawResult(); });
+    root.querySelector("#lb-auto").addEventListener("click", () => {
+      stations = [[]]; assigned = new Set(); const c = C();
+      let guard = 0;
+      while (assigned.size < Object.keys(TASKS).length && guard++ < 100) {
+        const rdy = ready().sort((a,b) => TASKS[b].t - TASKS[a].t);
+        let placed = false;
+        for (const id of rdy) { if (stationTime(stations[stations.length-1]) + TASKS[id].t <= c) { stations[stations.length-1].push(id); assigned.add(id); placed = true; break; } }
+        if (!placed) stations.push([]);
+      }
+      drawStations(); drawResult();
+    });
+    root.querySelector("#lb-c-val").textContent = C()+"s";
+    drawTasks(); drawStations(); drawResult();
+  },
+  quiz: [
+    { q: "The theoretical minimum number of stations is calculated as:", options: ["ΣTi × C","⌈ΣTi / C⌉","C / ΣTi","Number of tasks / C"], correct: 1, explain: "N_min = ceiling(total task time ÷ cycle time) - the fewest stations physically possible, ignoring precedence." },
+    { q: "A task can be assigned to the current open station only if:", options: ["All its predecessors are already assigned somewhere","It is the shortest remaining task","The station is the last one created","Its task number is lowest"], correct: 0, explain: "Precedence must be respected - a task cannot be scheduled before the tasks it depends on." },
+    { q: "Balance efficiency close to 100% means:", options: ["Cycle time is too short","Almost no idle station-time - a well-balanced line","The line has too many stations","Precedence constraints were violated"], correct: 1, explain: "Efficiency = ΣTi/(N×C); close to 1 means stations are fully loaded with very little idle time." }
+  ],
+  references: [
+    "Anna University QE3102 Industrial System Design - Unit 3, Line Balancing.",
+    "Helgeson &amp; Birnie (1961), the largest-candidate-rule heuristic.",
+    "Groover, <i>Automation, Production Systems, and CIM</i> - line balancing measures."
+  ]
+});
+
+/* ---------- WS-07 Learning Curve ---------- */
+EXPERIMENTS.push({
+  id: "learning-curve", track: "ws", no: 7, title: "Learning Curve Analysis",
+  aim: "Predict how long the nth repetition of a task will take, given the time for the first unit and an assumed learning rate.",
+  theoryHTML: `
+    <p>Repeating a task makes people faster: the <b>learning curve</b> (or experience curve) models unit time as T<sub>n</sub> = T<sub>1</sub>·n<sup>b</sup>, where T<sub>1</sub> is the time for the first unit, n is the unit number, and b = ln(r)/ln(2) for a learning rate r (e.g. r = 0.85 for an "85% curve" means every doubling of cumulative output cuts unit time to 85% of its previous value).</p>
+    <p>Steeper learning (lower r, e.g. 70-80%) is typical of highly manual, novel assembly work; shallower learning (90-95%) is typical where much of the cycle is machine-paced. Learning-curve estimates are used to quote delivery times for early production batches, and to set incentive rates that tighten appropriately as workers gain experience.</p>`,
+  procedure: [
+    "Set the time for unit 1 (T₁) and choose a learning rate.",
+    "Read the chart of unit time vs. unit number, and the cumulative average time curve.",
+    "Enter any unit number N to read its predicted individual time.",
+    "Read the total (cumulative) time to produce the first N units."
+  ],
+  simHTML: `
+    <div class="sim-row">
+      <div class="sim-field"><label>Time for unit 1 (min)</label><input type="number" id="lc-t1" value="100" step="1" style="width:100px"></div>
+      <div class="sim-field"><label>Learning rate</label>
+        <select id="lc-rate"><option value="0.70">70% - steep, highly manual</option><option value="0.80" selected>80% - typical manual assembly</option><option value="0.85">85% - common benchmark</option><option value="0.90">90% - partly machine-paced</option><option value="0.95">95% - mostly machine-paced</option></select>
+      </div>
+      <div class="sim-field"><label>Find time for unit N</label><input type="number" id="lc-n" value="20" style="width:100px"></div>
+    </div>
+    <div class="canvas-wrap"><canvas id="lc-canvas" width="760" height="240"></canvas></div>
+    <div class="result-grid" id="lc-result"></div>
+    <div class="canvas-wrap" style="margin-top:12px"><canvas id="lc-apparatus" width="760" height="110"></canvas></div>
+    <div class="sim-row" style="align-items:flex-end"><button class="btn" id="lc-trial">▶ Run a timed trial of unit N</button>${speedControlHTML("lc-speed")}</div>
+    <div class="result-grid" id="lc-compare" style="margin-top:10px"></div>
+  `,
+  simInit(root) {
+    function b() { return Math.log(+root.querySelector("#lc-rate").value) / Math.log(2); }
+    function T1() { return +root.querySelector("#lc-t1").value || 1; }
+    function Tn(n) { return T1() * Math.pow(n, b()); }
+    function cumulative(N) { let s=0; for(let i=1;i<=N;i++) s+=Tn(i); return s; }
+    let trials = {};
+
+    function drawPace(progress) {
+      const cv = root.querySelector("#lc-apparatus"); if (!cv) return;
+      const N = Math.max(1, +root.querySelector("#lc-n").value || 1);
+      const ctx = cv.getContext("2d"), w = cv.width, h = cv.height, benchY = h - 40;
+      ctx.clearRect(0,0,w,h);
+      drawGroundLine(ctx, 20, w-20, h-14);
+      ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(60,benchY); ctx.lineTo(w-60,benchY); ctx.stroke();
+      const zones = [{x:110},{x:w/2},{x:w-110}];
+      zones.forEach(z => { ctx.beginPath(); ctx.arc(z.x,benchY,4,0,Math.PI*2); ctx.stroke(); });
+      const seg = progress<0.5?progress/0.5:1-(progress-0.5)/0.5, leg = progress<0.5?0:1;
+      const hx = zones[leg].x + (zones[leg+1].x-zones[leg].x)*seg;
+      const hy = benchY - 10 - Math.sin(seg*Math.PI)*20;
+      ctx.strokeStyle = cssVar("--ws"); ctx.fillStyle = cssVar("--ws"); ctx.lineWidth = 4; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(hx,benchY+20); ctx.lineTo(hx,hy); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx,hy,6,0,Math.PI*2); ctx.fill();
+      ctx.textAlign="left"; ctx.fillStyle = cssVar("--ink-muted"); ctx.font="11px 'IBM Plex Mono'";
+      ctx.fillText(`Unit ${N} pace - predicted cycle ${fmt(Tn(N),2)} min (watch the hand speed up as N grows)`, 12, 16);
+    }
+    function drawCompare() {
+      const N = Math.max(1, +root.querySelector("#lc-n").value || 1);
+      const box = root.querySelector("#lc-compare");
+      const t = trials[N];
+      if (t === undefined) { box.innerHTML = `<div class="result-tile" style="grid-column:1/-1"><div class="k">Experimental comparison</div><div class="v" style="font-size:0.9rem">Run a timed trial of unit ${N} to compare a simulated real cycle against the model's prediction.</div></div>`; return; }
+      box.innerHTML = compareTiles(`Unit ${N} time`, Tn(N), `Unit ${N} time`, t, "min", 3);
+    }
+    function draw() {
+      const N = Math.max(1, Math.min(200, +root.querySelector("#lc-n").value || 1));
+      const cv = root.querySelector("#lc-canvas"), ctx = cv.getContext("2d");
+      ctx.clearRect(0,0,cv.width,cv.height);
+      const maxN = Math.max(40, N);
+      const pts = []; for (let n=1;n<=maxN;n++) pts.push(Tn(n));
+      const maxY = pts[0];
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--line"); ctx.lineWidth = 1;
+      for (let g=0; g<=4; g++) { const y = 20 + g*(190/4); ctx.beginPath(); ctx.moveTo(50,y); ctx.lineTo(740,y); ctx.stroke(); }
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--ink-muted"); ctx.font = "11px 'IBM Plex Mono'";
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--ws"); ctx.lineWidth = 2; ctx.beginPath();
+      pts.forEach((v,i) => { const x = 50 + (i/(maxN-1))*680, y = 210 - (v/maxY)*190; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+      ctx.stroke();
+      ctx.fillText(fmt(maxY,0)+" min", 4, 24); ctx.fillText("0", 30, 214);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--ink");
+      ctx.beginPath(); const mx = 50 + ((N-1)/(maxN-1))*680, my = 210 - (Tn(N)/maxY)*190; ctx.arc(mx,my,4,0,7); ctx.fill();
+
+      root.querySelector("#lc-result").innerHTML = `
+        <div class="result-tile"><div class="k">b (log-log slope)</div><div class="v">${fmt(b(),4)}</div></div>
+        <div class="result-tile hl"><div class="k">Time for unit ${N}</div><div class="v">${fmt(Tn(N),2)} min</div></div>
+        <div class="result-tile hl"><div class="k">Cumulative time, units 1-${N}</div><div class="v">${fmt(cumulative(N),1)} min</div></div>
+        <div class="result-tile"><div class="k">Cumulative average time</div><div class="v">${fmt(cumulative(N)/N,2)} min</div></div>`;
+      drawPace(0.25); drawCompare();
+    }
+    $$("#lc-t1,#lc-rate,#lc-n", root).forEach(el => el.addEventListener("input", draw));
+    root.querySelector("#lc-trial").addEventListener("click", () => {
+      const N = Math.max(1, +root.querySelector("#lc-n").value || 1);
+      const btn = root.querySelector("#lc-trial"); btn.disabled = true;
+      const cycleMs = clamp(Tn(N)/T1()*900, 250, 900);
+      let elapsedScaled = 0, lastT = performance.now();
+      loopAnim(() => {
+        const now = performance.now(), dt = now - lastT; lastT = now;
+        elapsedScaled += dt * getSpeed(root, "lc-speed");
+        const frac = Math.min(elapsedScaled/cycleMs, 1);
+        drawPace(frac);
+        if (frac >= 1) {
+          trials[N] = Math.max(0.01, gaussianNoise(Tn(N), Tn(N)*0.07));
+          drawCompare(); btn.disabled = false;
+          return false;
+        }
+      });
+    });
+    draw();
+  },
+  quiz: [
+    { q: "An 80% learning curve means that every time cumulative output doubles, unit time falls to:", options: ["20% of its previous value","80% of its previous value","It stays the same","It falls by 80 minutes"], correct: 1, explain: "The learning rate r is exactly that ratio: unit n falls to r × (unit n/2)'s time at each doubling." },
+    { q: "Which type of task typically shows the steepest (lowest %) learning curve?", options: ["Highly automated, machine-paced work","Highly manual, novel assembly work","Work with no repetition at all","Inspection of finished goods only"], correct: 1, explain: "The more the cycle time depends on human dexterity and judgement, the more room there is to learn and speed up." },
+    { q: "The exponent b in Tn = T1·n^b is calculated as:", options: ["ln(r) / ln(2)","r / 2","2 × ln(r)","ln(2) / r"], correct: 0, explain: "b = ln(learning rate) / ln(2), which is always negative for r < 1, giving a declining curve." }
+  ],
+  references: [
+    "Anna University QE3102 Industrial System Design - Unit 2, Capacity Management.",
+    "Wright, T.P. (1936), original aircraft-industry learning curve study.",
+    "Niebel &amp; Freivalds - learning curve applications in work design."
+  ]
+});
+
+/* ---------- ERG-01 Anthropometry & Percentile Design ---------- */
+EXPERIMENTS.push({
+  id: "anthropometry", track: "erg", no: 1, title: "Anthropometry &amp; Percentile Design",
+  aim: "Compute a body-dimension value at a chosen population percentile, and apply the correct design rule - minimum, maximum, or adjustable - to a workstation dimension.",
+  theoryHTML: `
+    <p><b>Anthropometry</b> is the measurement of body dimensions across a population. Most dimensions are approximately normally distributed, so any percentile value can be computed as mean + z·SD, where z is the standard-normal value for that percentile (e.g. z≈1.645 for the 95th percentile, z≈−1.645 for the 5th).</p>
+    <p>The percentile you design to depends on the <b>type of constraint</b>: for a <b>clearance</b> (a doorway, an escape hatch, legroom) design for the <b>largest</b> user - the 95th (or 99th) percentile - so nearly everyone fits through. For a <b>reach</b> (a control, a shelf, an emergency stop) design for the <b>smallest</b> user - the 5th percentile - so nearly everyone can reach it. Where possible, design for an <b>adjustable range</b> spanning 5th to 95th percentile (an adjustable chair or desk) rather than a single fixed value - this is always the preferred solution when cost allows.</p>`,
+  procedure: [
+    "Choose a body dimension and sex/population group.",
+    "Move the percentile slider and read the computed value.",
+    "Choose the design task (clearance, reach, or seated work surface).",
+    "Read which percentile the tool recommends and why, and check your own reasoning in the quiz below."
+  ],
+  simHTML: `
+    <div class="sim-note">Representative Indian adult anthropometric values (indicative, standing/seated, mm) - for real design work, measure your own user population.</div>
+    <div class="canvas-wrap"><canvas id="an-apparatus" width="760" height="230"></canvas></div>
+    <div class="sim-row">
+      <div class="sim-field"><label>Dimension</label>
+        <select id="an-dim">
+          <option value="stature">Stature (standing height)</option>
+          <option value="eyeheight">Sitting eye height</option>
+          <option value="shoulder">Shoulder breadth (bideltoid)</option>
+          <option value="popliteal">Popliteal height (seat height ref.)</option>
+          <option value="elbow">Sitting elbow rest height</option>
+          <option value="reach">Forward functional reach</option>
+        </select>
+      </div>
+      <div class="sim-field"><label>Population</label><select id="an-sex"><option value="m">Adult male</option><option value="f">Adult female</option></select></div>
+      <div class="sim-field grow"><label>Percentile: <span id="an-pct-val" class="range-val">50th</span></label><input type="range" id="an-pct" min="1" max="99" value="50"></div>
+    </div>
+    <div class="result-grid" id="an-result"></div>
+    <div class="sim-row" style="margin-top:16px">
+      <div class="sim-field"><label>Design task</label>
+        <select id="an-task">
+          <option value="clearance">Clearance (e.g. doorway height)</option>
+          <option value="reach">Reach (e.g. emergency stop button)</option>
+          <option value="seat">Seated work surface</option>
+        </select>
+      </div>
+      <div class="sim-field" style="align-self:flex-end"><button class="btn" id="an-sample">🎲 Draw a random sample of 30</button></div>
+    </div>
+    <div class="sim-note" id="an-advice"></div>
+    <div class="result-grid" id="an-compare" style="margin-top:10px"></div>
+  `,
+  simInit(root) {
+    const DATA = {
+      stature: { m: [1660,62], f: [1524,56] },
+      eyeheight: { m: [762,32], f: [712,30] },
+      shoulder: { m: [452,24], f: [396,22] },
+      popliteal: { m: [412,22], f: [392,20] },
+      elbow: { m: [248,20], f: [237,19] },
+      reach: { m: [782,38], f: [712,34] }
+    };
+    let lastSample = null;
+    function drawApparatus(mean, sd, pct, val) {
+      const cv = root.querySelector("#an-apparatus"); if (!cv) return;
+      const ctx = cv.getContext("2d"), w = cv.width, h = cv.height, groundY = h - 30;
+      ctx.clearRect(0,0,w,h);
+      drawGroundLine(ctx, 20, w-20, groundY);
+      // ruler
+      const rulerX = 90, pxPerMm = 0.09, refMm = 1900;
+      ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(rulerX, groundY); ctx.lineTo(rulerX, groundY-refMm*pxPerMm); ctx.stroke();
+      for (let mm=0; mm<=refMm; mm+=100) { const y = groundY-mm*pxPerMm; ctx.beginPath(); ctx.moveTo(rulerX-6,y); ctx.lineTo(rulerX,y); ctx.stroke(); if (mm%500===0) { ctx.fillStyle=cssVar("--ink-muted"); ctx.font="9px 'IBM Plex Mono'"; ctx.textAlign="right"; ctx.fillText(mm+"mm", rulerX-9, y+3); } }
+      const scale = (val/1700) * 1.0;
+      const fig = drawStickFigure(ctx, { cx: 260, cy: groundY, scale: Math.max(0.5, Math.min(1.15, val/1650)), trunk: 0, neck: 0, upperArm: 5, lowerArm: 5, knee: 0, color: cssVar("--erg") });
+      ctx.strokeStyle = cssVar("--accent"); ctx.setLineDash([4,3]); ctx.lineWidth = 1.5;
+      const dimY = groundY - val*pxPerMm;
+      ctx.beginPath(); ctx.moveTo(rulerX, dimY); ctx.lineTo(340, dimY); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = cssVar("--accent"); ctx.font = "11px 'IBM Plex Mono'"; ctx.textAlign="left";
+      ctx.fillText(`P${pct} = ${fmt(val,0)} mm`, 350, dimY+4);
+      // sample dots if drawn
+      if (lastSample) {
+        ctx.fillStyle = cssVar("--ws");
+        lastSample.forEach((v,i) => { const x = 450 + (i%15)*18, y = 40 + Math.floor(i/15)*16; ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill(); });
+        ctx.fillStyle = cssVar("--ink-muted"); ctx.font="10px 'IBM Plex Mono'"; ctx.fillText("30 simulated measurements", 450, 20);
+      }
+    }
+    function drawCompare(mean, sd, pct) {
+      const box = root.querySelector("#an-compare");
+      if (!lastSample) { box.innerHTML = `<div class="result-tile" style="grid-column:1/-1"><div class="k">Experimental comparison</div><div class="v" style="font-size:0.9rem">Draw a random sample to compare an empirically-measured percentile against the theoretical (normal-distribution) value.</div></div>`; return; }
+      const sorted = [...lastSample].sort((a,b)=>a-b);
+      const rank = (pct/100)*(sorted.length-1);
+      const lo = Math.floor(rank), hi = Math.ceil(rank);
+      const empVal = sorted[lo] + (sorted[hi]-sorted[lo])*(rank-lo);
+      const theoVal = mean + zFromPercentile(pct)*sd;
+      box.innerHTML = compareTiles(`P${pct} value`, theoVal, `P${pct} value`, empVal, "mm", 0);
+    }
+    function draw() {
+      const dim = root.querySelector("#an-dim").value, sex = root.querySelector("#an-sex").value, pct = +root.querySelector("#an-pct").value;
+      root.querySelector("#an-pct-val").textContent = pct + (pct===1?"st":pct===2?"nd":pct===3?"rd":"th");
+      const [mean, sd] = DATA[dim][sex];
+      const z = zFromPercentile(pct);
+      const val = mean + z*sd;
+      root.querySelector("#an-result").innerHTML = `
+        <div class="result-tile"><div class="k">Population mean</div><div class="v">${mean} mm</div></div>
+        <div class="result-tile"><div class="k">SD</div><div class="v">${sd} mm</div></div>
+        <div class="result-tile"><div class="k">z-score</div><div class="v">${fmt(z,3)}</div></div>
+        <div class="result-tile hl"><div class="k">Value at P${pct}</div><div class="v">${fmt(val,0)} mm</div></div>`;
+      const task = root.querySelector("#an-task").value;
+      const lo = mean + zFromPercentile(5)*sd, hi = mean + zFromPercentile(95)*sd;
+      let advice = "";
+      if (task === "clearance") advice = `Design for a <b>clearance</b> using the 95th (or higher) percentile - currently ${fmt(hi,0)} mm - so the largest expected user still fits through.`;
+      else if (task === "reach") advice = `Design for a <b>reach</b> using the 5th percentile - currently ${fmt(lo,0)} mm - so even the smallest expected user can reach it.`;
+      else advice = `Prefer an <b>adjustable range</b> spanning P5-P95 (${fmt(lo,0)}-${fmt(hi,0)} mm) if the surface/chair can be made adjustable; if it must be fixed, favour a middle value close to P50 (${fmt(mean,0)} mm) and accept some users will be less than ideally fitted.`;
+      root.querySelector("#an-advice").innerHTML = advice;
+      drawApparatus(mean, sd, pct, val);
+      drawCompare(mean, sd, pct);
+    }
+    root.querySelector("#an-sample").addEventListener("click", () => {
+      const dim = root.querySelector("#an-dim").value, sex = root.querySelector("#an-sex").value;
+      const [mean, sd] = DATA[dim][sex];
+      lastSample = Array.from({length:30}, () => gaussianNoise(mean, sd));
+      draw();
+    });
+    $$("#an-dim,#an-sex", root).forEach(el => el.addEventListener("input", () => { lastSample = null; draw(); }));
+    $$("#an-pct,#an-task", root).forEach(el => el.addEventListener("input", draw));
+    draw();
+  },
+  quiz: [
+    { q: "A doorway height on a factory floor should be designed to accommodate:", options: ["The 5th percentile stature","The 50th percentile stature","The 95th (or higher) percentile stature","The average of male and female means only"], correct: 2, explain: "Clearance dimensions must fit the largest expected user, so design to a high percentile (95th or 99th)." },
+    { q: "An emergency stop button's reach distance should be designed for:", options: ["The 95th percentile reach","The 5th percentile reach","Exactly the 50th percentile","Whichever is cheapest to manufacture"], correct: 1, explain: "Reach constraints must be met even by the smallest user, so design to the 5th percentile." },
+    { q: "The best general solution when both very small and very large users must be well accommodated is:", options: ["Design to the 50th percentile only", "Design to the 95th percentile only", "Provide an adjustable range from about the 5th to the 95th percentile", "Use the male mean for everyone"], correct: 2, explain: "Adjustability is preferred over any single fixed percentile whenever cost allows - it serves the full range of users well." }
+  ],
+  references: [
+    "Anna University QE3102 Industrial System Design - Unit 1, Anthropometry.",
+    "Pheasant &amp; Haslegrave, <i>Bodyspace: Anthropometry, Ergonomics and the Design of Work</i>.",
+    "Sanders &amp; McCormick, <i>Human Factors in Engineering and Design</i> - percentile design method."
+  ]
+});
+
+/* ---------- ERG-02 RULA ---------- */
+EXPERIMENTS.push({
+  id: "rula", track: "erg", no: 2, title: "RULA - Rapid Upper Limb Assessment",
+  aim: "Score a seated, upper-limb-intensive task using RULA's posture, muscle-use, and force inputs, and read off the resulting action level.",
+  theoryHTML: `
+    <p><b>RULA</b> (Rapid Upper Limb Assessment, McAtamney &amp; Corlett, 1993) screens musculoskeletal risk from posture in upper-limb-dominant tasks. Group A scores the arm and wrist (upper arm, lower arm, wrist position, wrist twist); Group B scores the neck, trunk, and legs. Both groups add points for static/repeated muscle use and for the force or load being handled, then combine into a single <b>Grand Score</b> from 1 (best) to 7 (worst).</p>
+    <p>Action levels: <b>1-2</b> posture acceptable · <b>3-4</b> further investigation, change may be needed · <b>5-6</b> investigate soon, change soon · <b>7</b> investigate and change immediately. In current practice this scoring is increasingly automated from video using computer-vision posture tracking rather than a paper worksheet filled in from a photograph - the angle bands below are exactly what those tools compute automatically.</p>
+    <p class="note">This simulator uses RULA's standard angle bands and action-level thresholds, combined through a simplified additive model for teaching clarity. For a certified assessment, cross-check against the official RULA worksheet.</p>`,
+  procedure: [
+    "Set the upper arm, lower arm, wrist, and wrist-twist postures from the observed task.",
+    "Set neck, trunk, and leg support postures.",
+    "Set muscle-use (static or repeated) and the force/load being handled.",
+    "Read Score A, Score B, and the combined Grand Score with its action level."
+  ],
+  simHTML: `
+    <div class="sim-row">
+      <div class="sim-field"><label>Upper arm</label><select id="ru-ua"><option value="1">20° extension to 20° flexion</option><option value="2">>20° extension or 20-45° flexion</option><option value="3">45-90° flexion</option><option value="4">>90° flexion</option></select></div>
+      <div class="sim-field"><label>Lower arm</label><select id="ru-la"><option value="1">60-100° flexion</option><option value="2">&lt;60° or &gt;100° flexion</option></select></div>
+      <div class="sim-field"><label>Wrist</label><select id="ru-wr"><option value="1">Neutral</option><option value="2">±15° flex/ext</option><option value="3">&gt;15° flex/ext</option></select></div>
+      <div class="sim-field"><label>Wrist twist</label><select id="ru-wt"><option value="1">Mid-range</option><option value="2">Near end of range</option></select></div>
+    </div>
+    <div class="sim-row">
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem"><input type="checkbox" id="ru-shoulder"> Shoulder raised</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem"><input type="checkbox" id="ru-abduct"> Arm abducted</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem"><input type="checkbox" id="ru-support"> Arm supported / leaning</label>
+    </div>
+    <div class="sim-row">
+      <div class="sim-field"><label>Neck</label><select id="ru-neck"><option value="1">0-10° flexion</option><option value="2">10-20° flexion</option><option value="3">&gt;20° flexion</option><option value="4">In extension</option></select></div>
+      <div class="sim-field"><label>Trunk</label><select id="ru-trunk"><option value="1">Upright, sitting well supported</option><option value="2">0-20° flexion</option><option value="3">20-60° flexion</option><option value="4">&gt;60° flexion</option></select></div>
+      <div class="sim-field"><label>Legs</label><select id="ru-legs"><option value="1">Seated, feet &amp; legs supported</option><option value="2">Unsupported / unevenly balanced</option></select></div>
+    </div>
+    <div class="sim-row">
+      <div class="sim-field"><label>Muscle use</label><select id="ru-muscle"><option value="0">Intermittent, &lt;4×/min</option><option value="1">Static &gt;1 min, or repeated &gt;4×/min</option></select></div>
+      <div class="sim-field"><label>Force / load</label><select id="ru-force"><option value="0">&lt;2 kg, intermittent</option><option value="1">2-10 kg, intermittent</option><option value="2">2-10 kg, static or repeated</option><option value="3">&gt;10 kg, or shock/rapid build-up</option></select></div>
+    </div>
+    <div class="canvas-wrap"><canvas id="ru-apparatus" width="760" height="220"></canvas></div>
+    <div class="result-grid" id="ru-result"></div>
+    <div class="sim-actions"><button class="btn" id="ru-capture">📷 Simulate automated video capture</button></div>
+    <div class="result-grid" id="ru-compare" style="margin-top:10px"></div>
+  `,
+  simInit(root) {
+    const UA_DEG = {1:5,2:30,3:65,4:100,5:115,6:130};
+    const LA_DEG = {1:80,2:35};
+    const WR_DEG = {1:0,2:10,3:25};
+    const NECK_DEG = {1:5,2:15,3:28,4:-15};
+    const TRUNK_DEG = {1:0,2:12,3:40,4:70};
+    function catUA(d) { return d<=20?1:d<=45?2:d<=90?3:d<=115?4:d<=125?5:6; }
+    function catLA(d) { return (d>=60&&d<=100)?1:2; }
+    function catWR(d) { const a=Math.abs(d); return a<=3?1:a<=15?2:3; }
+    function catNeck(d) { return d<0?4:d<=10?1:d<=20?2:3; }
+    function catTrunk(d) { return d<=2?1:d<=20?2:d<=60?3:4; }
+    function scoreFromCats(ua,la,wr,wt,neck,trunk,legs,muscle,force) {
+      const scoreA = clamp(ua+la+wr+(wt-1), 1, 9);
+      const scoreB = clamp(neck+trunk+(legs-1), 1, 9);
+      const cScore = clamp(scoreA+muscle+force, 1, 9);
+      const dScore = clamp(scoreB+muscle+force, 1, 9);
+      const grand = clamp(Math.round((cScore+dScore)/2 * 7/9), 1, 7);
+      return { scoreA, scoreB, grand };
+    }
+    function levelOf(grand) {
+      if (grand <= 2) return ["Acceptable posture.", "good"];
+      if (grand <= 4) return ["Further investigation needed; change may be required.", "warn"];
+      if (grand <= 6) return ["Investigate soon; change soon.", "warn"];
+      return ["Investigate and change immediately.", "danger"];
+    }
+    function readInputs() {
+      let ua = +root.querySelector("#ru-ua").value;
+      if (root.querySelector("#ru-shoulder").checked) ua++;
+      if (root.querySelector("#ru-abduct").checked) ua++;
+      if (root.querySelector("#ru-support").checked) ua--;
+      ua = clamp(ua,1,6);
+      return {
+        ua, la: +root.querySelector("#ru-la").value, wr: +root.querySelector("#ru-wr").value, wt: +root.querySelector("#ru-wt").value,
+        neck: +root.querySelector("#ru-neck").value, trunk: +root.querySelector("#ru-trunk").value, legs: +root.querySelector("#ru-legs").value,
+        muscle: +root.querySelector("#ru-muscle").value, force: +root.querySelector("#ru-force").value
+      };
+    }
+    function drawApparatus(inp) {
+      const cv = root.querySelector("#ru-apparatus"); if (!cv) return;
+      const ctx = cv.getContext("2d"), w=cv.width, h=cv.height;
+      ctx.clearRect(0,0,w,h);
+      drawGroundLine(ctx, 30, w-30, h-30);
+      ctx.fillStyle = cssVar("--ink-muted"); ctx.font="10px 'IBM Plex Mono'"; ctx.textAlign="left";
+      ctx.fillText("Schematic posture - angles map to the RULA bands selected above (not to exact scale)", 12, 16);
+      drawStickFigure(ctx, {
+        cx: w/2, cy: h-30, scale: 1.3,
+        trunk: TRUNK_DEG[inp.trunk], neck: NECK_DEG[inp.neck],
+        upperArm: UA_DEG[inp.ua], lowerArm: LA_DEG[inp.la],
+        knee: inp.legs===1?0:22, color: cssVar("--erg"), loadBox: inp.force>0
+      });
+    }
+    function compute() {
+      const inp = readInputs();
+      const r = scoreFromCats(inp.ua, inp.la, inp.wr, inp.wt, inp.neck, inp.trunk, inp.legs, inp.muscle, inp.force);
+      const [level, badge] = levelOf(r.grand);
+      root.querySelector("#ru-result").innerHTML = `
+        <div class="result-tile"><div class="k">Score A (arm/wrist)</div><div class="v">${r.scoreA}</div></div>
+        <div class="result-tile"><div class="k">Score B (neck/trunk/legs)</div><div class="v">${r.scoreB}</div></div>
+        <div class="result-tile hl"><div class="k">Grand score</div><div class="v">${r.grand} / 7</div></div>
+        <div class="result-tile"><div class="k">Action level</div><div class="v"><span class="badge ${badge}">${level}</span></div></div>`;
+      drawApparatus(inp);
+      return { inp, r };
+    }
+    root.querySelector("#ru-capture").addEventListener("click", () => {
+      const { inp, r } = compute();
+      const noisy = {
+        ua: catUA(UA_DEG[inp.ua] + gaussianNoise(0,6)),
+        la: catLA(LA_DEG[inp.la] + gaussianNoise(0,6)),
+        wr: catWR(WR_DEG[inp.wr] + gaussianNoise(0,4)),
+        wt: inp.wt,
+        neck: catNeck(NECK_DEG[inp.neck] + gaussianNoise(0,4)),
+        trunk: catTrunk(TRUNK_DEG[inp.trunk] + gaussianNoise(0,5)),
+        legs: inp.legs, muscle: inp.muscle, force: inp.force
+      };
+      const rNoisy = scoreFromCats(noisy.ua, noisy.la, noisy.wr, noisy.wt, noisy.neck, noisy.trunk, noisy.legs, noisy.muscle, noisy.force);
+      root.querySelector("#ru-compare").innerHTML = compareTiles("Grand score", r.grand, "Grand score", rNoisy.grand, "", 0)
+        + `<div class="result-tile" style="grid-column:1/-1"><div class="k">Why they can differ</div><div class="v" style="font-size:0.84rem;font-weight:400;font-family:'Literata',serif">A video/IMU system measures continuous joint angles with sensor noise, which can push a borderline posture across a RULA category boundary - exactly what this simulates.</div></div>`;
+    });
+    $$("select, input[type=checkbox]", root).forEach(el => el.addEventListener("input", compute));
+    compute();
+  },
+  quiz: [
+    { q: "RULA Group A scores which body regions?", options: ["Neck, trunk, legs","Upper arm, lower arm, wrist","Back and hips only","Whole body equally"], correct: 1, explain: "Group A covers the arm and wrist chain; Group B covers neck, trunk, and legs." },
+    { q: "A RULA Grand Score of 7 means:", options: ["Posture is acceptable","Further investigation may be needed","Investigate soon, change soon","Investigate and change immediately"], correct: 3, explain: "7 is the top of RULA's 1-7 scale and calls for immediate investigation and change." },
+    { q: "Repeating a motion more than 4 times per minute adds to which RULA input?", options: ["Force/load score","Muscle-use score","Wrist twist score","Leg support score"], correct: 1, explain: "Static holding beyond 1 minute or repetition beyond 4×/min both raise the muscle-use score, added to both Score A and Score B." }
+  ],
+  references: [
+    "McAtamney, L. &amp; Corlett, E.N. (1993), 'RULA: a survey method for the investigation of work-related upper limb disorders', <i>Applied Ergonomics</i> 24(2), 91-99.",
+    "Anna University IE23401 Applied Ergonomics - posture assessment techniques.",
+    "Sanders &amp; McCormick, <i>Human Factors in Engineering and Design</i> - posture-risk scoring methods."
+  ]
+});
+
+/* ---------- ERG-03 REBA ---------- */
+EXPERIMENTS.push({
+  id: "reba", track: "erg", no: 3, title: "REBA - Rapid Entire Body Assessment",
+  aim: "Score a whole-body task - standing, lifting, or asymmetric postures RULA does not cover well - using REBA's trunk, neck, leg, arm, and coupling inputs.",
+  theoryHTML: `
+    <p><b>REBA</b> (Rapid Entire Body Assessment, Hignett &amp; McAtamney, 2000) extends the same logic as RULA to whole-body postures common in manual handling, nursing, and warehouse work - where the legs and trunk carry as much risk as the arms. Group A scores trunk, neck, and legs, adjusted for load/force; Group B scores upper arm, lower arm, and wrist, adjusted for the quality of the hand-to-load coupling. The two are combined into REBA's final score (1-15), further adjusted for activity type (static holding, repeated small-range motion, or large rapid postural changes).</p>
+    <p class="note">This simulator uses REBA's standard angle bands and action-level thresholds with a simplified additive combination for teaching clarity. For a certified assessment, cross-check against the official REBA worksheet.</p>`,
+  procedure: [
+    "Set trunk, neck, and leg posture, and whether both legs bear weight evenly.",
+    "Set the load/force being handled, and whether it arrives with a shock or rapid build-up.",
+    "Set upper arm, lower arm, and wrist posture, and the coupling (hand-to-load grip) quality.",
+    "Set the activity type.",
+    "Read the final REBA score and risk level."
+  ],
+  simHTML: `
+    <div class="sim-row">
+      <div class="sim-field"><label>Trunk</label><select id="rb-trunk"><option value="1">Upright</option><option value="2">0-20° flex or extension</option><option value="3">20-60° flexion, or &gt;20° extension</option><option value="4">&gt;60° flexion</option></select></div>
+      <div class="sim-field"><label>Neck</label><select id="rb-neck"><option value="1">0-20° flexion</option><option value="2">&gt;20° flexion, or any extension</option></select></div>
+      <div class="sim-field"><label>Legs</label><select id="rb-legs"><option value="1">Bilateral weight-bearing, walking, or sitting</option><option value="2">Unilateral / unstable weight-bearing</option></select></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem;align-self:center"><input type="checkbox" id="rb-kneebend"> Knees bent 30-60° (add) / &gt;60° (add more)</label>
+    </div>
+    <div class="sim-row">
+      <div class="sim-field"><label>Load / force</label><select id="rb-load"><option value="0">&lt;5 kg</option><option value="1">5-10 kg</option><option value="2">&gt;10 kg</option></select></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem;align-self:center"><input type="checkbox" id="rb-shock"> Shock or rapid build-up of force</label>
+    </div>
+    <div class="sim-row">
+      <div class="sim-field"><label>Upper arm</label><select id="rb-ua"><option value="1">20° extension to 20° flexion</option><option value="2">&gt;20° extension or 20-45° flexion</option><option value="3">45-90° flexion</option><option value="4">&gt;90° flexion</option></select></div>
+      <div class="sim-field"><label>Lower arm</label><select id="rb-la"><option value="1">60-100° flexion</option><option value="2">&lt;60° or &gt;100°</option></select></div>
+      <div class="sim-field"><label>Wrist</label><select id="rb-wr"><option value="1">±15° of neutral</option><option value="2">&gt;15° flex/ext</option></select></div>
+    </div>
+    <div class="sim-row">
+      <div class="sim-field"><label>Coupling (grip)</label><select id="rb-coupling"><option value="0">Good - well-fitting handle</option><option value="1">Fair - acceptable but not ideal</option><option value="2">Poor - handhold not acceptable</option><option value="3">Unacceptable - no handle, awkward, unsafe</option></select></div>
+      <div class="sim-field"><label>Activity</label><select id="rb-activity"><option value="0">Brief, non-repeated</option><option value="1">Static &gt;1 min, or repeated small-range</option><option value="2">Rapid large postural changes / unstable base</option></select></div>
+    </div>
+    <div class="canvas-wrap"><canvas id="rb-apparatus" width="760" height="220"></canvas></div>
+    <div class="result-grid" id="rb-result"></div>
+    <div class="sim-actions"><button class="btn" id="rb-capture">📷 Simulate automated video capture</button></div>
+    <div class="result-grid" id="rb-compare" style="margin-top:10px"></div>
+  `,
+  simInit(root) {
+    const TRUNK_DEG = {1:0,2:12,3:40,4:70};
+    const NECK_DEG = {1:8,2:28};
+    const UA_DEG = {1:5,2:30,3:65,4:100};
+    const LA_DEG = {1:80,2:35};
+    const WR_DEG = {1:8,2:25};
+    function catTrunk(d){ return d<=2?1:d<=20?2:d<=60?3:4; }
+    function catNeck(d){ return d<=20?1:2; }
+    function catUA(d){ return d<=20?1:d<=45?2:d<=90?3:4; }
+    function catLA(d){ return (d>=60&&d<=100)?1:2; }
+    function catWR(d){ return Math.abs(d)<=15?1:2; }
+
+    function readInputs() {
+      let legs = +root.querySelector("#rb-legs").value;
+      if (root.querySelector("#rb-kneebend").checked) legs += 1;
+      legs = clamp(legs,1,4);
+      return {
+        trunk: +root.querySelector("#rb-trunk").value, neck: +root.querySelector("#rb-neck").value, legs,
+        load: +root.querySelector("#rb-load").value + (root.querySelector("#rb-shock").checked ? 1 : 0),
+        ua: +root.querySelector("#rb-ua").value, la: +root.querySelector("#rb-la").value, wr: +root.querySelector("#rb-wr").value,
+        coupling: +root.querySelector("#rb-coupling").value, activity: +root.querySelector("#rb-activity").value
+      };
+    }
+    function scoreFromCats(i) {
+      const scoreA = clamp(i.trunk + i.neck + i.legs + i.load, 1, 13);
+      const scoreB = clamp(i.ua + i.la + i.wr + i.coupling, 1, 12);
+      const scoreC = clamp(Math.round((scoreA + scoreB) / 2) + i.activity, 1, 15);
+      return { scoreA, scoreB, scoreC };
+    }
+    function levelOf(scoreC) {
+      if (scoreC === 1) return ["Negligible risk - no action needed.", "good"];
+      if (scoreC <= 3) return ["Low risk - change may be needed.", "good"];
+      if (scoreC <= 7) return ["Medium risk - investigate, change soon.", "warn"];
+      if (scoreC <= 10) return ["High risk - investigate and implement change soon.", "danger"];
+      return ["Very high risk - implement change immediately.", "danger"];
+    }
+    function drawApparatus(i) {
+      const cv = root.querySelector("#rb-apparatus"); if (!cv) return;
+      const ctx = cv.getContext("2d"), w=cv.width, h=cv.height;
+      ctx.clearRect(0,0,w,h);
+      drawGroundLine(ctx, 30, w-30, h-30);
+      ctx.fillStyle = cssVar("--ink-muted"); ctx.font="10px 'IBM Plex Mono'"; ctx.textAlign="left";
+      ctx.fillText("Schematic posture - angles map to the REBA bands selected above (not to exact scale)", 12, 16);
+      drawStickFigure(ctx, {
+        cx: w/2, cy: h-30, scale: 1.3,
+        trunk: TRUNK_DEG[i.trunk], neck: NECK_DEG[i.neck],
+        upperArm: UA_DEG[i.ua], lowerArm: LA_DEG[i.la],
+        knee: i.legs>=3?30:(i.legs===2?12:0), color: cssVar("--erg"), loadBox: i.load>0
+      });
+    }
+    function compute() {
+      const i = readInputs();
+      const s = scoreFromCats(i);
+      const [level, badge] = levelOf(s.scoreC);
+      root.querySelector("#rb-result").innerHTML = `
+        <div class="result-tile"><div class="k">Score A (trunk/neck/legs + load)</div><div class="v">${s.scoreA}</div></div>
+        <div class="result-tile"><div class="k">Score B (arm/wrist + coupling)</div><div class="v">${s.scoreB}</div></div>
+        <div class="result-tile hl"><div class="k">REBA score</div><div class="v">${s.scoreC} / 15</div></div>
+        <div class="result-tile"><div class="k">Risk level</div><div class="v"><span class="badge ${badge}">${level}</span></div></div>`;
+      drawApparatus(i);
+      return { i, s };
+    }
+    root.querySelector("#rb-capture").addEventListener("click", () => {
+      const { i, s } = compute();
+      const noisy = {
+        trunk: catTrunk(TRUNK_DEG[i.trunk] + gaussianNoise(0,5)),
+        neck: catNeck(NECK_DEG[i.neck] + gaussianNoise(0,5)),
+        legs: i.legs, load: i.load,
+        ua: catUA(UA_DEG[i.ua] + gaussianNoise(0,6)),
+        la: catLA(LA_DEG[i.la] + gaussianNoise(0,6)),
+        wr: catWR(WR_DEG[i.wr] + gaussianNoise(0,4)),
+        coupling: i.coupling, activity: i.activity
+      };
+      const sNoisy = scoreFromCats(noisy);
+      root.querySelector("#rb-compare").innerHTML = compareTiles("REBA score", s.scoreC, "REBA score", sNoisy.scoreC, "", 0)
+        + `<div class="result-tile" style="grid-column:1/-1"><div class="k">Why they can differ</div><div class="v" style="font-size:0.84rem;font-weight:400;font-family:'Literata',serif">Automated capture measures continuous angles with sensor noise, which can shift a borderline posture across a REBA band.</div></div>`;
+    });
+    $$("select, input[type=checkbox]", root).forEach(el => el.addEventListener("input", compute));
+    compute();
+  },
+  quiz: [
+    { q: "REBA differs from RULA mainly in that REBA:", options: ["Only scores the wrist","Covers whole-body postures including legs and load coupling, suited to manual handling", "Cannot be used for standing tasks", "Ignores the trunk entirely"], correct: 1, explain: "REBA was developed to extend RULA-style screening to standing, manual-handling, and caregiving postures." },
+    { q: "In REBA, 'coupling' refers to:", options: ["The angle between neck and trunk","How well the hand grips the load or handle","The frequency of motion","The distance walked during the task"], correct: 1, explain: "Coupling scores the quality of the hand-to-load or hand-to-handle grip, since a poor grip raises strain and drop risk." },
+    { q: "A REBA final score of 11-15 indicates:", options: ["Negligible risk","Low risk","Medium risk","Very high risk - implement change immediately"], correct: 3, explain: "11-15 is REBA's top band, calling for immediate action." }
+  ],
+  references: [
+    "Hignett, S. &amp; McAtamney, L. (2000), 'Rapid Entire Body Assessment (REBA)', <i>Applied Ergonomics</i> 31(2), 201-205.",
+    "Anna University IE23401 Applied Ergonomics - whole-body posture assessment.",
+    "Current industry practice: video- and wearable-sensor-based automated REBA/RULA scoring, replacing paper worksheets."
+  ]
+});
+
+/* ---------- ERG-04 NIOSH Lifting Equation ---------- */
+EXPERIMENTS.push({
+  id: "niosh-lifting", track: "erg", no: 4, title: "NIOSH Lifting Equation",
+  aim: "Compute the Recommended Weight Limit (RWL) and Lifting Index (LI) for a manual lift, and identify which task variable drives the risk.",
+  theoryHTML: `
+    <p>The <b>NIOSH (1991, revised) Lifting Equation</b> starts from a Load Constant LC = 23 kg - the maximum recommended weight under ideal conditions - and derates it by six multipliers, each capturing one way a real lift departs from ideal: Horizontal distance (HM), Vertical height (VM), vertical Distance travelled (DM), Asymmetry angle (AM), lift Frequency (FM), and hand-load Coupling (CM).</p>
+    <p><b>RWL = LC × HM × VM × DM × AM × FM × CM</b>, where HM = 25/H, VM = 1 − 0.003|V−75|, DM = 0.82 + 4.5/D (H, V, D in cm), AM = 1 − 0.0032A (A in degrees), and CM depends on grip quality. The <b>Lifting Index LI = actual load weight ÷ RWL</b>: LI ≤ 1 is low risk for most workers, 1 &lt; LI ≤ 3 is elevated risk, LI &gt; 3 is high risk requiring redesign.</p>
+    <p class="note">FM (frequency multiplier) is approximated here with a smooth curve matching the shape of the published NIOSH frequency table; for exact values at a specific duration category, consult NIOSH (1994) Table 5.</p>`,
+  procedure: [
+    "Set the horizontal distance of the load from the body (H) and its vertical height at the start of the lift (V).",
+    "Set the vertical travel distance of the lift (D) and the body's asymmetry (twist) angle (A).",
+    "Set the lift frequency and the coupling (grip) quality.",
+    "Enter the actual weight being lifted.",
+    "Read the RWL, the Lifting Index, and which multiplier is most reduced (the biggest risk driver)."
+  ],
+  simHTML: `
+    <div class="sim-row">
+      <div class="sim-field"><label>Horizontal distance H (cm): <span id="ns-h-val" class="range-val">30</span></label><input type="range" id="ns-h" min="20" max="63" value="30"></div>
+      <div class="sim-field"><label>Vertical height V (cm): <span id="ns-v-val" class="range-val">75</span></label><input type="range" id="ns-v" min="0" max="175" value="75"></div>
+      <div class="sim-field"><label>Vertical travel D (cm): <span id="ns-d-val" class="range-val">40</span></label><input type="range" id="ns-d" min="25" max="175" value="40"></div>
+      <div class="sim-field"><label>Asymmetry A (°): <span id="ns-a-val" class="range-val">0</span></label><input type="range" id="ns-a" min="0" max="135" value="0"></div>
+    </div>
+    <div class="sim-row">
+      <div class="sim-field"><label>Frequency (lifts/min): <span id="ns-f-val" class="range-val">1</span></label><input type="range" id="ns-f" min="0.1" max="15" step="0.1" value="1"></div>
+      <div class="sim-field"><label>Coupling</label><select id="ns-c"><option value="good">Good</option><option value="fair" selected>Fair</option><option value="poor">Poor</option></select></div>
+      <div class="sim-field"><label>Load weight (kg)</label><input type="number" id="ns-load" value="15" style="width:100px"></div>
+    </div>
+    <div class="canvas-wrap"><canvas id="ns-apparatus" width="760" height="220"></canvas></div>
+    <div class="result-grid" id="ns-result"></div>
+    <div class="sim-actions"><button class="btn" id="ns-trial">🏋️ Run a simulated lift trial (motion-capture reading)</button></div>
+    <div class="result-grid" id="ns-compare" style="margin-top:10px"></div>
+  `,
+  simInit(root) {
+    function niosh(H,V,D,A,F,coupling,load) {
+      const LC = 23;
+      const HM = clamp(25/H, 0, 1);
+      const VM = clamp(1 - 0.003*Math.abs(V-75), 0, 1);
+      const DM = clamp(0.82 + 4.5/Math.max(D,25), 0, 1);
+      const AM = clamp(1 - 0.0032*A, 0, 1);
+      const FM = clamp(1 - 0.15*Math.log(1+F), 0.1, 1);
+      const CM = coupling === "good" ? 1.00 : (coupling === "fair" ? (V<75?0.95:1.00) : (V<75?0.90:0.95));
+      const RWL = LC*HM*VM*DM*AM*FM*CM;
+      const LI = load / RWL;
+      return { HM,VM,DM,AM,FM,CM,RWL,LI };
+    }
+    function drawApparatus(H,V) {
+      const cv = root.querySelector("#ns-apparatus"); if (!cv) return;
+      const ctx = cv.getContext("2d"), w=cv.width, h=cv.height, groundY = h-30, scale = 0.75;
+      ctx.clearRect(0,0,w,h);
+      drawGroundLine(ctx, 30, w-30, groundY);
+      const cx = 200;
+      const trunkDeg = clamp(65 - V*0.55, 0, 65);
+      const kneeDeg = clamp(50 - V*0.4, 0, 45);
+      drawStickFigure(ctx, { cx, cy: groundY, scale: 1.15, trunk: trunkDeg, neck: 10, upperArm: 60, lowerArm: 50, knee: kneeDeg, color: cssVar("--erg") });
+      const bx = cx + H*scale, by = groundY - V*scale;
+      ctx.strokeStyle = cssVar("--ws"); ctx.lineWidth = 2; ctx.strokeRect(bx-14, by-12, 28, 24);
+      ctx.setLineDash([4,3]); ctx.strokeStyle = cssVar("--accent");
+      ctx.beginPath(); ctx.moveTo(cx, groundY+14); ctx.lineTo(bx, groundY+14); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx+40, groundY); ctx.lineTo(bx+40, by); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = cssVar("--accent"); ctx.font="10px 'IBM Plex Mono'"; ctx.textAlign="center";
+      ctx.fillText(`H=${fmt(H,0)}cm`, (cx+bx)/2, groundY+28);
+      ctx.textAlign="left"; ctx.fillText(`V=${fmt(V,0)}cm`, bx+46, (groundY+by)/2);
+    }
+    function readInputs() {
+      const H = +root.querySelector("#ns-h").value, V = +root.querySelector("#ns-v").value, D = +root.querySelector("#ns-d").value, A = +root.querySelector("#ns-a").value, F = +root.querySelector("#ns-f").value;
+      root.querySelector("#ns-h-val").textContent = H; root.querySelector("#ns-v-val").textContent = V; root.querySelector("#ns-d-val").textContent = D; root.querySelector("#ns-a-val").textContent = A; root.querySelector("#ns-f-val").textContent = F;
+      return { H, V, D, A, F, coupling: root.querySelector("#ns-c").value, load: +root.querySelector("#ns-load").value };
+    }
+    function compute() {
+      const p = readInputs();
+      const r = niosh(p.H,p.V,p.D,p.A,p.F,p.coupling,p.load);
+      const worst = Object.entries({HM:r.HM,VM:r.VM,DM:r.DM,AM:r.AM,FM:r.FM,CM:r.CM}).sort((a,b)=>a[1]-b[1])[0];
+      let badge, level;
+      if (r.LI <= 1) { badge="good"; level="Low risk for most workers."; }
+      else if (r.LI <= 3) { badge="warn"; level="Elevated risk - some workers may be at risk."; }
+      else { badge="danger"; level="High risk - most workers would be at risk; redesign the lift."; }
+      root.querySelector("#ns-result").innerHTML = `
+        <div class="result-tile"><div class="k">HM</div><div class="v">${fmt(r.HM,2)}</div></div>
+        <div class="result-tile"><div class="k">VM</div><div class="v">${fmt(r.VM,2)}</div></div>
+        <div class="result-tile"><div class="k">DM</div><div class="v">${fmt(r.DM,2)}</div></div>
+        <div class="result-tile"><div class="k">AM</div><div class="v">${fmt(r.AM,2)}</div></div>
+        <div class="result-tile"><div class="k">FM (approx.)</div><div class="v">${fmt(r.FM,2)}</div></div>
+        <div class="result-tile"><div class="k">CM</div><div class="v">${fmt(r.CM,2)}</div></div>
+        <div class="result-tile hl"><div class="k">RWL - specified</div><div class="v">${fmt(r.RWL,1)} kg</div></div>
+        <div class="result-tile hl"><div class="k">Lifting Index - specified</div><div class="v">${fmt(r.LI,2)}</div></div>
+        <div class="result-tile"><div class="k">Risk</div><div class="v"><span class="badge ${badge}">${level}</span></div></div>
+        <div class="result-tile"><div class="k">Biggest risk driver</div><div class="v" style="font-size:0.95rem">${worst[0]} (${fmt(worst[1],2)})</div></div>`;
+      drawApparatus(p.H, p.V);
+      return { p, r };
+    }
+    root.querySelector("#ns-trial").addEventListener("click", () => {
+      const { p, r } = compute();
+      const mH = clamp(gaussianNoise(p.H,2.5),15,80), mV = clamp(gaussianNoise(p.V,4),0,180), mD = clamp(gaussianNoise(p.D,3),20,180), mA = clamp(gaussianNoise(p.A,4),0,135);
+      const rMeas = niosh(mH,mV,mD,mA,p.F,p.coupling,p.load);
+      root.querySelector("#ns-compare").innerHTML = compareTiles("RWL", r.RWL, "RWL (motion-capture reading)", rMeas.RWL, "kg", 1)
+        + compareTiles("Lifting Index", r.LI, "Lifting Index (motion-capture reading)", rMeas.LI, "", 2);
+    });
+    $$("input, select", root).forEach(el => el.addEventListener("input", compute));
+    compute();
+  },
+  quiz: [
+    { q: "Increasing the horizontal distance H between the load and the body will:", options: ["Increase HM, raising RWL","Decrease HM, lowering RWL","Have no effect on RWL","Only affect the Lifting Index, not RWL"], correct: 1, explain: "HM = 25/H - a larger H gives a smaller multiplier, lowering the Recommended Weight Limit." },
+    { q: "The Lifting Index (LI) is calculated as:", options: ["RWL ÷ load weight","Load weight ÷ RWL","Load weight × RWL","Load weight − RWL"], correct: 1, explain: "LI = actual load weight ÷ RWL; LI > 1 means the load exceeds the recommended limit for that lift geometry." },
+    { q: "VM (vertical multiplier) is highest - closest to 1 - when the load's vertical height V is:", options: ["At floor level (0 cm)","At about 75 cm (roughly knuckle height)","Above shoulder height","VM does not depend on V"], correct: 1, explain: "VM = 1 − 0.003|V−75|, which peaks at V = 75 cm, the height associated with lowest spinal loading." }
+  ],
+  references: [
+    "Waters, T.R. et al. (1993), 'Revised NIOSH equation for the design and evaluation of manual lifting tasks', <i>Ergonomics</i> 36(7), 749-776.",
+    "NIOSH (1994), <i>Applications Manual for the Revised NIOSH Lifting Equation</i>.",
+    "Anna University IE23401 Applied Ergonomics - manual materials handling."
+  ]
+});
+
+/* ---------- ERG-05 OWAS ---------- */
+EXPERIMENTS.push({
+  id: "owas", track: "erg", no: 5, title: "OWAS - Ovako Working Posture Analysis",
+  aim: "Code a working posture by back, arms, legs, and load, and read the resulting OWAS action category.",
+  theoryHTML: `
+    <p><b>OWAS</b> (Ovako Working Posture Analysis System, Karhu et al., 1977) was developed in the Finnish steel industry as a fast, whole-shift posture-sampling method: an observer codes posture at intervals using just four simple, easily-recognised categories - back, arms, legs, and load - rather than measuring joint angles precisely. Its speed makes it well suited to sampling many postures across a long, varied job, complementing the more detailed single-posture analysis of RULA/REBA.</p>
+    <p class="note">The full official OWAS table has 252 back×arm×leg×load combinations. This simulator uses a simplified rule-based approximation of that table for teaching; for a certified assessment consult the published action-category table.</p>`,
+  procedure: [
+    "Observe (or imagine observing) the worker at a sampled instant.",
+    "Code the back, arms, legs, and load being handled at that instant.",
+    "Read the resulting action category and its meaning."
+  ],
+  simHTML: `
+    <div class="canvas-wrap"><canvas id="ow-apparatus" width="760" height="200"></canvas></div>
+    <div class="sim-row">
+      <div class="sim-field"><label>Back</label><select id="ow-back"><option value="1">1 - Straight</option><option value="2">2 - Bent</option><option value="3">3 - Twisted (or bent sideways)</option><option value="4">4 - Bent and twisted</option></select></div>
+      <div class="sim-field"><label>Arms</label><select id="ow-arms"><option value="1">1 - Both below shoulder level</option><option value="2">2 - One at or above shoulder</option><option value="3">3 - Both at or above shoulder</option></select></div>
+      <div class="sim-field"><label>Legs</label><select id="ow-legs"><option value="1">1 - Sitting</option><option value="2">2 - Standing, both legs straight</option><option value="3">3 - Standing, weight on one straight leg</option><option value="4">4 - Standing/crouching, both knees bent</option><option value="5">5 - Standing/crouching, weight on one bent knee</option><option value="6">6 - Kneeling</option><option value="7">7 - Walking</option></select></div>
+      <div class="sim-field"><label>Load / force</label><select id="ow-load"><option value="1">1 - ≤ 10 kg</option><option value="2">2 - 10-20 kg</option><option value="3">3 - &gt; 20 kg</option></select></div>
+    </div>
+    <div class="result-grid" id="ow-result"></div>
+    <div class="sim-note">OWAS's real strength is sampling many instants across a shift, not scoring one posture - try it below.</div>
+    <div class="sim-actions"><button class="btn" id="ow-shift">🎲 Sample this job across a shift (30 instants)</button></div>
+    <div class="result-grid" id="ow-compare" style="margin-top:10px"></div>
+  `,
+  simInit(root) {
+    function catOf(back, arms, legs, load) {
+      let cat = 1;
+      if (back >= 3) cat = Math.max(cat, 2);
+      if (back === 4) cat = Math.max(cat, 3);
+      if (arms === 3) cat = Math.max(cat, 2);
+      if ([4,5].includes(legs)) cat = Math.max(cat, 2);
+      if (legs === 6) cat = Math.max(cat, 3);
+      if (load === 2) cat = Math.max(cat, 2);
+      if (load === 3) cat = Math.max(cat, 3);
+      if (back === 4 && [4,5,6].includes(legs)) cat = Math.max(cat, 3);
+      if ((back >= 3 || [4,5,6].includes(legs)) && load === 3) cat = 4;
+      if (back === 4 && arms === 3 && load >= 2) cat = 4;
+      return cat;
+    }
+    const BACK_DEG = {1:0,2:35,3:35,4:55};
+    const ARM_DEG = {1:20,2:70,3:110};
+    const LEG_KNEE = {1:0,2:0,3:0,4:35,5:35,6:55,7:15};
+    function drawApparatus(back,arms,legs,load,twisted) {
+      const cv = root.querySelector("#ow-apparatus"); if (!cv) return;
+      const ctx = cv.getContext("2d"), w=cv.width, h=cv.height;
+      ctx.clearRect(0,0,w,h);
+      drawGroundLine(ctx, 30, w-30, h-30);
+      ctx.fillStyle = cssVar("--ink-muted"); ctx.font="10px 'IBM Plex Mono'"; ctx.textAlign="left";
+      ctx.fillText(`Back ${back} · Arms ${arms} · Legs ${legs} · Load ${load}${twisted?" (twisted)":""} - schematic`, 12, 16);
+      drawStickFigure(ctx, { cx: w/2, cy: h-30, scale: 1.3, trunk: BACK_DEG[back], neck: 8, upperArm: ARM_DEG[arms], lowerArm: 40, knee: LEG_KNEE[legs], color: cssVar("--erg"), loadBox: load>1 });
+    }
+    function compute() {
+      const back = +root.querySelector("#ow-back").value, arms = +root.querySelector("#ow-arms").value, legs = +root.querySelector("#ow-legs").value, load = +root.querySelector("#ow-load").value;
+      const cat = catOf(back,arms,legs,load);
+      const MEANING = {
+        1: ["No action needed.", "good"], 2: ["Action in the near future.", "warn"],
+        3: ["Action as soon as possible.", "warn"], 4: ["Action immediately.", "danger"]
+      };
+      const [txt, badge] = MEANING[cat];
+      root.querySelector("#ow-result").innerHTML = `
+        <div class="result-tile"><div class="k">Posture code</div><div class="v" style="font-size:1.05rem">${back}-${arms}-${legs}-${load}</div></div>
+        <div class="result-tile hl"><div class="k">Action category</div><div class="v">${cat}</div></div>
+        <div class="result-tile"><div class="k">Meaning</div><div class="v"><span class="badge ${badge}">${txt}</span></div></div>`;
+      drawApparatus(back,arms,legs,load,back===3);
+    }
+    root.querySelector("#ow-shift").addEventListener("click", () => {
+      const postures = [
+        { back:1, arms:1, legs:2, load:1, w:0.40 },
+        { back:2, arms:1, legs:2, load:1, w:0.25 },
+        { back:3, arms:2, legs:4, load:2, w:0.20 },
+        { back:4, arms:3, legs:5, load:3, w:0.15 }
+      ];
+      const cum = []; let acc=0; postures.forEach(p=>{ acc+=p.w; cum.push(acc); });
+      const tally = {1:0,2:0,3:0,4:0};
+      for (let i=0;i<30;i++) { const r=Math.random(); const p = postures[cum.findIndex(c=>r<=c)] || postures[postures.length-1]; tally[catOf(p.back,p.arms,p.legs,p.load)]++; }
+      const highRiskPct = (tally[3]+tally[4])/30*100;
+      root.querySelector("#ow-compare").innerHTML = `
+        <div class="result-tile"><div class="k">Cat 1 (no action)</div><div class="v">${tally[1]}/30</div></div>
+        <div class="result-tile"><div class="k">Cat 2 (near future)</div><div class="v">${tally[2]}/30</div></div>
+        <div class="result-tile"><div class="k">Cat 3 (soon)</div><div class="v">${tally[3]}/30</div></div>
+        <div class="result-tile"><div class="k">Cat 4 (immediately)</div><div class="v">${tally[4]}/30</div></div>`
+        + compareTiles("% time high-risk (Cat 3-4), if job matched its ideal posture", 0, "% time high-risk (Cat 3-4), sampled across the shift", highRiskPct, "%", 0);
+    });
+    $$("select", root).forEach(el => el.addEventListener("input", compute));
+    compute();
+  },
+  quiz: [
+    { q: "OWAS codes posture using how many body/load categories?", options: ["Two - back and arms only","Three - back, arms, legs","Four - back, arms, legs, load","Six - every major joint"], correct: 2, explain: "OWAS uses four categories in total: back, arms, legs, and load/force - the third listed is legs, making three posture categories plus load." },
+    { q: "OWAS was originally developed for use in which context?", options: ["Office computer work","The Finnish steel industry, for fast whole-shift sampling","Aircraft cockpit design","Laboratory bench work only"], correct: 1, explain: "OWAS (Ovako Working Posture Analysis System) was built for fast posture sampling on the shop floor at a Finnish steel company." },
+    { q: "OWAS Action Category 4 means:", options: ["No action needed", "Action in the near future", "Action as soon as possible", "Action immediately"], correct: 3, explain: "Category 4 is OWAS's most severe band, calling for immediate corrective action." }
+  ],
+  references: [
+    "Karhu, O., Kansi, P. &amp; Kuorinka, I. (1977), 'Correcting working postures in industry: a practical method for analysis', <i>Applied Ergonomics</i> 8(4), 199-201.",
+    "Anna University IE23401 Applied Ergonomics - posture sampling methods.",
+    "Stanton et al., <i>Handbook of Human Factors and Ergonomics Methods</i> - OWAS summary."
+  ]
+});
+
+/* ---------- ERG-06 Workstation Design ---------- */
+EXPERIMENTS.push({
+  id: "workstation-design", track: "erg", no: 6, title: "Workstation Design - Sit / Stand Geometry",
+  aim: "Derive recommended desk height, seat height, and monitor position for a given user percentile, sex, and posture, and see the fit shown on a simple scaled diagram.",
+  theoryHTML: `
+    <p>A workstation designed around anthropometric data, not guesswork, follows three simple rules. <b>Seat height</b> ≈ popliteal height (the underside of the thigh to the floor), so feet rest flat with knees at roughly 90°. <b>Work-surface height</b> is set relative to elbow height: for <i>precision</i> work, 0-10 cm above elbow height, so the hands are close to the eyes; for <i>light</i> work, roughly at elbow height; for <i>heavy</i> work needing downward force, 10-20 cm below elbow height, so the arms and body weight can help. <b>Monitor top</b> should sit slightly below eye height, so the neck stays close to neutral.</p>
+    <p>Standing workstations use the same rules with standing (not sitting) elbow and eye heights. Because these dimensions vary across the population, the safest approach - as in the Anthropometry experiment - is an adjustable-height desk and chair spanning roughly the 5th-95th percentile range, rather than one fixed height for everyone.</p>`,
+  procedure: [
+    "Choose sex, posture (seated or standing), and percentile.",
+    "Choose the work type - precision, light, or heavy - to set the work-surface offset rule.",
+    "Read the recommended seat height, desk height, and monitor-top height.",
+    "Look at the scaled diagram to see how a 5th-percentile and 95th-percentile user would each fit the same fixed desk height."
+  ],
+  simHTML: `
+    <div class="sim-row">
+      <div class="sim-field"><label>Sex</label><select id="wd-sex"><option value="m">Male</option><option value="f">Female</option></select></div>
+      <div class="sim-field"><label>Posture</label><select id="wd-posture"><option value="sit">Seated</option><option value="stand">Standing</option></select></div>
+      <div class="sim-field"><label>Design percentile</label><select id="wd-pct"><option value="5">5th</option><option value="50" selected>50th</option><option value="95">95th</option></select></div>
+      <div class="sim-field"><label>Work type</label><select id="wd-work"><option value="precision">Precision (fine assembly)</option><option value="light" selected>Light (general assembly)</option><option value="heavy">Heavy (needs downward force)</option></select></div>
+    </div>
+    <div class="canvas-wrap"><canvas id="wd-canvas" width="760" height="280"></canvas></div>
+    <div class="result-grid" id="wd-result"></div>
+    <div class="sim-actions"><button class="btn" id="wd-random">🎲 Seat a randomly-sampled worker at this fixed desk</button></div>
+    <div class="result-grid" id="wd-compare" style="margin-top:10px"></div>
+  `,
+  simInit(root) {
+    const DATA = {
+      m: { stature: 1660, eye_sit: 762, eye_stand: 1550, elbow_sit: 248, elbow_stand: 1040, popliteal: 412 },
+      f: { stature: 1524, eye_sit: 712, eye_stand: 1440, elbow_sit: 237, elbow_stand: 970, popliteal: 392 }
+    };
+    const SD_FRAC = 0.037; // approx SD as fraction of mean, for scaling percentile
+    function valAt(mean, pct) { const sd = mean*SD_FRAC; return mean + zFromPercentile(pct)*sd; }
+    let lastDesk = null, lastElbowMean = null;
+
+    function compute() {
+      const sex = root.querySelector("#wd-sex").value, posture = root.querySelector("#wd-posture").value, pct = +root.querySelector("#wd-pct").value, work = root.querySelector("#wd-work").value;
+      const d = DATA[sex];
+      const eyeMean = posture === "sit" ? d.eye_sit : d.eye_stand;
+      const elbowMean = posture === "sit" ? d.elbow_sit : d.elbow_stand;
+      const eye = valAt(eyeMean, pct), elbow = valAt(elbowMean, pct), popliteal = valAt(d.popliteal, pct);
+      const offset = work === "precision" ? 6 : work === "light" ? 0 : -15;
+      const desk = elbow + offset;
+      const monitorTop = eye - 8;
+      const seat = posture === "sit" ? popliteal - 20 : null; // -20mm for footwear/clearance
+
+      root.querySelector("#wd-result").innerHTML = `
+        <div class="result-tile"><div class="k">Eye height</div><div class="v">${fmt(eye/10,1)} cm</div></div>
+        <div class="result-tile"><div class="k">Elbow height</div><div class="v">${fmt(elbow/10,1)} cm</div></div>
+        ${posture==="sit" ? `<div class="result-tile"><div class="k">Seat height</div><div class="v">${fmt(seat/10,1)} cm</div></div>` : ""}
+        <div class="result-tile hl"><div class="k">Work-surface height</div><div class="v">${fmt(desk/10,1)} cm</div></div>
+        <div class="result-tile hl"><div class="k">Monitor top</div><div class="v">${fmt(monitorTop/10,1)} cm</div></div>`;
+
+      const cv = root.querySelector("#wd-canvas"), ctx = cv.getContext("2d");
+      ctx.clearRect(0,0,cv.width,cv.height);
+      const ground = 250, scale = 0.12;
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--line"); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(30,ground); ctx.lineTo(730,ground); ctx.stroke();
+      function figure(x, statureMm, elbowMm, eyeMm, label, color) {
+        const stH = statureMm*scale, elbH = elbowMm*scale, eyeH = eyeMm*scale;
+        ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(x, ground-stH+10, 9, 0, 7); ctx.stroke(); // head
+        ctx.beginPath(); ctx.moveTo(x, ground-stH+19); ctx.lineTo(x, ground-elbH*0.3); ctx.stroke(); // torso approx
+        ctx.beginPath(); ctx.moveTo(x, ground-elbH*0.3); ctx.lineTo(x, ground); ctx.stroke(); // legs approx
+        ctx.font = "10px 'IBM Plex Mono'"; ctx.fillText(label, x-16, ground+16);
+        ctx.beginPath(); ctx.moveTo(x-14, ground-elbH); ctx.lineTo(x+14, ground-elbH); ctx.stroke(); // elbow marker
+      }
+      const deskH = desk*scale;
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--accent"); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(120, ground-deskH); ctx.lineTo(640, ground-deskH); ctx.stroke();
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--accent");
+      ctx.font = "11px 'IBM Plex Mono'"; ctx.fillText("Fixed work surface - " + fmt(desk/10,0) + " cm", 300, ground-deskH-8);
+      const wsAmber = getComputedStyle(document.documentElement).getPropertyValue("--ws");
+      const erg = getComputedStyle(document.documentElement).getPropertyValue("--erg");
+      figure(220, valAt(d.stature,5), valAt(elbowMean,5), valAt(eyeMean,5), "P5", wsAmber.trim() || "#A6752C");
+      figure(540, valAt(d.stature,95), valAt(elbowMean,95), valAt(eyeMean,95), "P95", erg.trim() || "#1E7A6D");
+      lastDesk = desk; lastElbowMean = elbowMean;
+    }
+    root.querySelector("#wd-random").addEventListener("click", () => {
+      const sex = root.querySelector("#wd-sex").value;
+      const sdFrac = SD_FRAC;
+      const randomElbow = gaussianNoise(lastElbowMean, lastElbowMean*sdFrac);
+      const mismatch = (lastDesk - randomElbow) / 10; // cm; +ve = desk above this worker's elbow
+      const box = root.querySelector("#wd-compare");
+      box.innerHTML = compareTiles("Desk-to-elbow mismatch (by design, at the chosen percentile)", 0, "Desk-to-elbow mismatch (this randomly-sampled worker)", mismatch, "cm", 1)
+        + `<div class="result-tile" style="grid-column:1/-1"><div class="k">Reading</div><div class="v" style="font-size:0.84rem;font-weight:400;font-family:'Literata',serif">${mismatch>1 ? "This worker's elbow sits noticeably below the desk - likely to raise their shoulders or hunch to reach it." : mismatch<-1 ? "This worker's elbow sits noticeably above the desk - likely to stoop." : "This worker's elbow is close to desk height - a comfortable fit."}</div></div>`;
+    });
+    $$("select", root).forEach(el => el.addEventListener("input", compute));
+    compute();
+  },
+  quiz: [
+    { q: "Seat height for a seated workstation should be set close to which dimension?", options: ["Stature","Sitting elbow height","Popliteal height","Eye height"], correct: 2, explain: "Popliteal height (underside of thigh to floor) sets seat height so feet rest flat with the knee near 90°." },
+    { q: "For heavy work requiring the operator to press or push down with force, the work surface should be set:", options: ["Well above elbow height","At exactly eye height","Below elbow height, so body weight assists","It makes no difference"], correct: 2, explain: "A lower surface (roughly 10-20 cm below elbow height) lets the arms and upper body add downward force efficiently." },
+    { q: "A single fixed-height desk designed for the 50th percentile user will tend to:", options: ["Fit everyone equally well","Under-serve users well below or above the 50th percentile","Only be a problem for standing tasks","Have no effect on posture"], correct: 1, explain: "A fixed dimension always favours users near that percentile and increasingly under-serves users toward the tails - hence the preference for adjustability." }
+  ],
+  references: [
+    "Anna University IE23401 Applied Ergonomics - workplace and workstation design.",
+    "Pheasant &amp; Haslegrave, <i>Bodyspace</i> - work-surface height guidelines.",
+    "Sanders &amp; McCormick, <i>Human Factors in Engineering and Design</i> - seated workstation geometry."
+  ]
+});
+
+/* ---------- ERG-07 Physical Workload / Energy Expenditure ---------- */
+EXPERIMENTS.push({
+  id: "energy-expenditure", track: "erg", no: 7, title: "Physical Workload &amp; Energy Expenditure",
+  aim: "Classify a task's physical workload from heart rate, and compute the rest allowance needed using Murrell's energy-expenditure formula.",
+  theoryHTML: `
+    <p>Two independent methods gauge physical workload. The <b>heart-rate method</b> compares working heart rate to resting heart rate and estimated maximum heart rate (HR<sub>max</sub> ≈ 220 − age), giving <b>%Heart Rate Reserve</b> = (HR<sub>work</sub> − HR<sub>rest</sub>) / (HR<sub>max</sub> − HR<sub>rest</sub>) × 100 - a widely used proxy for relative aerobic workload.</p>
+    <p>The <b>energy-expenditure method</b> classifies a task by its metabolic cost in kcal/min (Very Light to Very Heavy) and applies <b>Murrell's rest-allowance formula</b>: R = T(W − S) / (W − 1.5), where T is total working time (min), W is the task's average energy expenditure (kcal/min), and S is the acceptable standard rate (commonly 5 kcal/min for an 8-hour shift). R gives the minutes of rest that must be scheduled into the shift to keep average expenditure at or below S.</p>`,
+  procedure: [
+    "Enter age, resting heart rate, and working heart rate to see %HRR and the workload classification.",
+    "Choose a task energy category (or enter a custom kcal/min value).",
+    "Enter total working time T and the standard acceptable rate S.",
+    "Read the required rest allowance R and the resulting work:rest schedule."
+  ],
+  simHTML: `
+    <h3 style="font-family:'Literata',serif;font-weight:600;font-size:0.95rem;margin:0 0 10px">Heart-rate method</h3>
+    <div class="canvas-wrap"><canvas id="ee-ecg" width="760" height="100"></canvas></div>
+    <div class="sim-row" style="margin-top:8px">${speedControlHTML("ee-speed")}</div>
+    <div class="sim-row">
+      <div class="sim-field"><label>Age (yrs)</label><input type="number" id="ee-age" value="30" style="width:90px"></div>
+      <div class="sim-field"><label>Resting HR (bpm)</label><input type="number" id="ee-rest" value="70" style="width:90px"></div>
+      <div class="sim-field"><label>Working HR (bpm)</label><input type="number" id="ee-work" value="115" style="width:90px"></div>
+    </div>
+    <div class="result-grid" id="ee-hr-result"></div>
+
+    <h3 style="font-family:'Literata',serif;font-weight:600;font-size:0.95rem;margin:22px 0 10px">Energy-expenditure method - Murrell's rest allowance</h3>
+    <div class="sim-row">
+      <div class="sim-field"><label>Task category</label>
+        <select id="ee-cat">
+          <option value="2.2">Very light (≈2.2 kcal/min)</option>
+          <option value="3.7" selected>Light (≈3.7 kcal/min)</option>
+          <option value="6.0">Moderate (≈6.0 kcal/min)</option>
+          <option value="8.5">Heavy (≈8.5 kcal/min)</option>
+          <option value="11">Very heavy (≈11 kcal/min)</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div class="sim-field" id="ee-custom-wrap" style="display:none"><label>Custom W (kcal/min)</label><input type="number" id="ee-custom" value="6" style="width:90px"></div>
+      <div class="sim-field"><label>Total working time T (min)</label><input type="number" id="ee-t" value="480" style="width:100px"></div>
+      <div class="sim-field"><label>Standard rate S (kcal/min)</label><input type="number" id="ee-s" value="5" step="0.5" style="width:90px"></div>
+    </div>
+    <div class="result-grid" id="ee-result"></div>
+    <div class="sim-actions"><button class="btn" id="ee-shift">▶ Run a simulated shift (fluctuating energy readings)</button></div>
+    <div class="result-grid" id="ee-compare" style="margin-top:10px"></div>
+  `,
+  simInit(root) {
+    loopAnim((t) => {
+      const cv = root.querySelector("#ee-ecg"); if (!cv) return false;
+      const hr = clamp(+root.querySelector("#ee-work").value || 70, 30, 220);
+      const ctx = cv.getContext("2d"), w = cv.width, h = cv.height, baseY = h/2;
+      ctx.clearRect(0,0,w,h);
+      ctx.strokeStyle = cssVar("--erg"); ctx.lineWidth = 2; ctx.beginPath();
+      const periodPx = clamp(7200/hr, 45, 260);
+      const scrollPx = (t||0) * 0.09 * getSpeed(root, "ee-speed");
+      for (let x=0; x<w; x++) {
+        const phase = ((x + scrollPx) % periodPx) / periodPx;
+        const spike = Math.exp(-(((phase-0.5)*26)**2)) * 26 - Math.exp(-(((phase-0.35)*40)**2))*10;
+        const y = baseY - spike;
+        x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+      ctx.fillStyle = cssVar("--ink-muted"); ctx.font="11px 'IBM Plex Mono'"; ctx.textAlign="left";
+      ctx.fillText(`${hr} bpm`, 12, 16);
+    });
+    function computeHR() {
+      const age = +root.querySelector("#ee-age").value, rest = +root.querySelector("#ee-rest").value, work = +root.querySelector("#ee-work").value;
+      const hrmax = 220 - age;
+      const pctHRR = clamp((work-rest)/(hrmax-rest)*100, 0, 200);
+      let cls, badge;
+      if (pctHRR < 30) { cls = "Light workload"; badge = "good"; }
+      else if (pctHRR < 50) { cls = "Moderate workload"; badge = "warn"; }
+      else if (pctHRR < 75) { cls = "Heavy workload"; badge = "warn"; }
+      else { cls = "Very heavy workload"; badge = "danger"; }
+      root.querySelector("#ee-hr-result").innerHTML = `
+        <div class="result-tile"><div class="k">Estimated HRmax</div><div class="v">${hrmax} bpm</div></div>
+        <div class="result-tile hl"><div class="k">%Heart Rate Reserve</div><div class="v">${fmt(pctHRR,1)}%</div></div>
+        <div class="result-tile"><div class="k">Classification</div><div class="v"><span class="badge ${badge}">${cls}</span></div></div>`;
+    }
+    function murrell(W,T,S) { return W > S ? T*(W-S)/(W-1.5) : 0; }
+    function readEE() {
+      const catSel = root.querySelector("#ee-cat").value;
+      const W = catSel === "custom" ? (+root.querySelector("#ee-custom").value || 0) : +catSel;
+      return { W, T: +root.querySelector("#ee-t").value, S: +root.querySelector("#ee-s").value };
+    }
+    function computeEE() {
+      const { W, T, S } = readEE();
+      const R = murrell(W,T,S);
+      const workTime = Math.max(T - R, 0);
+      root.querySelector("#ee-result").innerHTML = `
+        <div class="result-tile"><div class="k">Task energy rate W</div><div class="v">${fmt(W,1)} kcal/min</div></div>
+        <div class="result-tile"><div class="k">Total energy over shift</div><div class="v">${fmt(W*T,0)} kcal</div></div>
+        <div class="result-tile hl"><div class="k">Rest allowance R</div><div class="v">${fmt(R,1)} min</div></div>
+        <div class="result-tile"><div class="k">Suggested schedule</div><div class="v" style="font-size:0.92rem">${fmt(workTime,0)} min work : ${fmt(R,0)} min rest</div></div>`;
+    }
+    root.querySelector("#ee-shift").addEventListener("click", () => {
+      const { W, T, S } = readEE();
+      const n = 40;
+      const readings = Array.from({length:n}, () => Math.max(1, gaussianNoise(W, W*0.12)));
+      const wMeasured = readings.reduce((a,b)=>a+b,0)/n;
+      const rTheo = murrell(W,T,S), rMeas = murrell(wMeasured,T,S);
+      root.querySelector("#ee-compare").innerHTML = compareTiles("Rest allowance R", rTheo, "Rest allowance R (measured shift)", rMeas, "min", 1)
+        + compareTiles("Energy rate W", W, "Energy rate W (measured average)", wMeasured, "kcal/min", 2);
+    });
+    root.querySelector("#ee-cat").addEventListener("change", e => { root.querySelector("#ee-custom-wrap").style.display = e.target.value === "custom" ? "flex" : "none"; computeEE(); });
+    $$("#ee-age,#ee-rest,#ee-work", root).forEach(el => el.addEventListener("input", computeHR));
+    $$("#ee-custom,#ee-t,#ee-s", root).forEach(el => el.addEventListener("input", computeEE));
+    computeHR(); computeEE();
+  },
+  quiz: [
+    { q: "%Heart Rate Reserve is calculated relative to which two reference points?", options: ["Body weight and age","Resting HR and estimated maximum HR","Ambient temperature and humidity","Shift length and break frequency"], correct: 1, explain: "%HRR = (working HR − resting HR) / (HRmax − resting HR) × 100 - it scales working HR between the person's own rest and max." },
+    { q: "In Murrell's formula R = T(W−S)/(W−1.5), what does S represent?", options: ["The worker's resting heart rate","The standard acceptable energy expenditure rate (kcal/min)","The total shift length","The number of rest breaks"], correct: 1, explain: "S is the acceptable average energy-expenditure rate - commonly 5 kcal/min - that the schedule should not exceed on average." },
+    { q: "If a task's energy expenditure W is less than or equal to S, Murrell's formula implies:", options: ["A very large rest allowance is needed","No formal rest allowance is needed", "The task is impossible to sustain", "R becomes negative and undefined"], correct: 1, explain: "When W ≤ S, the task itself is already within the acceptable average rate, so no scheduled rest allowance is required." }
+  ],
+  references: [
+    "Murrell, K.F.H. (1965), <i>Ergonomics: Man in his Working Environment</i> - rest-allowance formula.",
+    "Anna University IE23401 Applied Ergonomics - physical workload and energy expenditure.",
+    "Christensen, E.H., classification of work by energy expenditure category."
+  ]
+});
+
+/* ---------- shell rendering ---------- */
+const TRACK_LABEL = { ws: "Work System Design", erg: "Ergonomics" };
+
+function renderSidebar(activeId) {
+  const sb = $("#sidebar");
+  sb.innerHTML = ["ws", "erg"].map(track => `
+    <div class="side-group ${track}">
+      <div class="side-group-label">${TRACK_LABEL[track]}</div>
+      ${EXPERIMENTS.filter(e => e.track === track).map(e => `
+        <a class="side-link ${e.id === activeId ? "active" : ""}" href="#/exp/${e.id}">
+          <span class="side-no">${track.toUpperCase()}-${String(e.no).padStart(2,"0")}</span>${e.title}
+        </a>`).join("")}
+    </div>`).join("");
+}
+
+function renderHome() {
+  const main = $("#main");
+  const wsList = EXPERIMENTS.filter(e => e.track === "ws");
+  const ergList = EXPERIMENTS.filter(e => e.track === "erg");
+  main.innerHTML = `
+    <div class="hero">
+      <p class="eyebrow">Virtual Laboratory · Industrial Engineering</p>
+      <h1>Work System Design &amp; Ergonomics</h1>
+      <p class="lede">${EXPERIMENTS.length} simulation-based experiments - method study, work measurement and line design on one side; posture, load and workload assessment on the other. Every experiment runs Aim → Theory → Procedure → Interactive Simulator → Self-Assessment → References, the classic virtual-laboratory format.</p>
+    </div>
+
+    <div class="info-card">
+      <h3>How this lab is grounded</h3>
+      <p>The experiment set follows the practical syllabus of Anna University's <b>IE23301 Work System Design</b> and <b>IE23401 Applied Ergonomics</b> (B.E. Industrial Engineering, Regulations 2023), extended beyond that syllabus using the structure common to simulation-based teaching laboratories and current industrial ergonomics practice.</p>
+      <div class="grounding-row">
+        <div class="grounding-tile"><div class="k">Format</div><div class="v">Every experiment runs Aim, Theory, Procedure, an interactive simulator, a self-assessment, and References - the standard teaching-laboratory sequence.</div></div>
+        <div class="grounding-tile"><div class="k">Classic references</div><div class="v">ILO, <em>Introduction to Work Study</em>; Niebel &amp; Freivalds, <em>Methods, Standards, and Work Design</em>; Sanders &amp; McCormick, <em>Human Factors in Engineering and Design</em></div></div>
+        <div class="grounding-tile"><div class="k">Standard instruments</div><div class="v">RULA (McAtamney &amp; Corlett, 1993), REBA (Hignett &amp; McAtamney, 2000), the NIOSH 1991 revised lifting equation, OWAS (Karhu et al., 1977)</div></div>
+        <div class="grounding-tile"><div class="k">Current industry trend</div><div class="v">RULA/REBA/NIOSH scoring is moving from paper worksheets to video- and wearable-sensor-based automated assessment (computer-vision posture tracking, IMU motion capture, digital human modelling) - noted where relevant in each ergonomics experiment's theory.</div></div>
+      </div>
+    </div>
+
+    <section class="track-section ws">
+      <div class="track-head"><h2>Work System Design</h2><span class="track-count">${wsList.length} experiments</span></div>
+      <p class="track-blurb">Method study and work measurement: charting a job, timing it, rating the operator, sampling idle time, predicting time without a stopwatch, and balancing it across a line.</p>
+      <div class="card-grid">
+        ${wsList.map(e => `
+          <a class="exp-card" href="#/exp/${e.id}">
+            <span class="no">WS-${String(e.no).padStart(2,"0")}</span>
+            <h4>${e.title}</h4>
+            <p>${e.aim}</p>
+          </a>`).join("")}
+      </div>
+    </section>
+
+    <section class="track-section erg">
+      <div class="track-head"><h2>Ergonomics</h2><span class="track-count">${ergList.length} experiments</span></div>
+      <p class="track-blurb">Fitting the work to the worker: body dimensions, posture risk scoring, safe lifting limits, workstation geometry and physical workload.</p>
+      <div class="card-grid">
+        ${ergList.map(e => `
+          <a class="exp-card" href="#/exp/${e.id}">
+            <span class="no">ERG-${String(e.no).padStart(2,"0")}</span>
+            <h4>${e.title}</h4>
+            <p>${e.aim}</p>
+          </a>`).join("")}
+      </div>
+    </section>
+  `;
+  window.scrollTo(0, 0);
+}
+
+function renderTrack(track) {
+  const main = $("#main");
+  const list = EXPERIMENTS.filter(e => e.track === track);
+  main.innerHTML = `
+    <div class="exp-crumb"><a href="#/">Index</a> / ${TRACK_LABEL[track]}</div>
+    <section class="track-section ${track}">
+      <div class="track-head"><h2>${TRACK_LABEL[track]}</h2><span class="track-count">${list.length} experiments</span></div>
+      <div class="card-grid">
+        ${list.map(e => `
+          <a class="exp-card" href="#/exp/${e.id}">
+            <span class="no">${track.toUpperCase()}-${String(e.no).padStart(2,"0")}</span>
+            <h4>${e.title}</h4>
+            <p>${e.aim}</p>
+          </a>`).join("")}
+      </div>
+    </section>`;
+  window.scrollTo(0, 0);
+}
+
+function renderExperiment(exp) {
+  const main = $("#main");
+  const trackList = EXPERIMENTS.filter(e => e.track === exp.track);
+  const i = trackList.findIndex(e => e.id === exp.id);
+  const prev = trackList[i-1], next = trackList[i+1];
+  main.innerHTML = `
+    <div class="exp-page track-${exp.track}">
+      <div class="exp-crumb"><a href="#/">Index</a> / <a href="#/track/${exp.track}">${TRACK_LABEL[exp.track]}</a></div>
+      <div class="exp-titleblock">
+        <span class="exp-no">${exp.track.toUpperCase()}-${String(exp.no).padStart(2,"0")}</span>
+        <h1>${exp.title}</h1>
+      </div>
+
+      <section class="exp-section"><h2><span class="sec-tag">01</span>Aim</h2><p>${exp.aim}</p></section>
+      <section class="exp-section"><h2><span class="sec-tag">02</span>Theory</h2>${exp.theoryHTML}</section>
+      <section class="exp-section"><h2><span class="sec-tag">03</span>Procedure</h2><ol class="procedure-list">${exp.procedure.map(s => `<li>${s}</li>`).join("")}</ol></section>
+      <section class="exp-section"><h2><span class="sec-tag">04</span>Interactive Simulator</h2><div class="sim-panel" id="sim-mount">${exp.simHTML}</div></section>
+      <section class="exp-section"><h2><span class="sec-tag">05</span>Self-Assessment</h2><div id="quiz-mount"></div></section>
+      <section class="exp-section"><h2><span class="sec-tag">06</span>References</h2><ul class="ref-list">${exp.references.map(r => `<li>${r}</li>`).join("")}</ul></section>
+
+      <nav class="exp-pagenav">
+        ${prev ? `<a class="pagenav-link prev" href="#/exp/${prev.id}"><span>← Previous</span>${prev.title}</a>` : "<span></span>"}
+        ${next ? `<a class="pagenav-link next" href="#/exp/${next.id}"><span>Next →</span>${next.title}</a>` : "<span></span>"}
+      </nav>
+    </div>`;
+  exp.simInit($("#sim-mount"));
+  renderQuiz(exp, $("#quiz-mount"));
+  window.scrollTo(0, 0);
+}
+
+function render() {
+  clearAllTimers();
+  const hash = location.hash || "#/";
+  let activeId = null, m;
+  if ((m = hash.match(/^#\/exp\/(.+)$/))) {
+    const exp = EXPERIMENTS.find(e => e.id === m[1]);
+    activeId = m[1];
+    renderSidebar(activeId);
+    $$("#top-nav a").forEach(a => a.classList.remove("on-ws", "on-erg"));
+    if (exp) { renderExperiment(exp); return; }
+  } else if ((m = hash.match(/^#\/track\/(ws|erg)$/))) {
+    renderSidebar(null);
+    renderTrack(m[1]);
+    return;
+  }
+  renderSidebar(null);
+  renderHome();
+}
+
+window.addEventListener("hashchange", render);
+window.addEventListener("DOMContentLoaded", render);
+if (document.readyState !== "loading") render();
+</script>
