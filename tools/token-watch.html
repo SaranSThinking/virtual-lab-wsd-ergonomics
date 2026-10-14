@@ -1,0 +1,449 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><title>Token Watch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one calm column. Needs-attention first, spend second, advice last. */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --ink:#15202b; --mute:#566474; --line:#dce1e8;
+  --accent:#1d5fbf; --accent-ink:#ffffff; --reply:#1d5fbf; --cut:#b3261e; --todo:#94580a; --good:#1b7a43;
+  --font:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1319; --surface:#161d25; --ink:#e6eaef; --mute:#97a3b1; --line:#27313c;
+  --accent:#6ea4f2; --accent-ink:#0e1319; --reply:#6ea4f2; --cut:#f2867d; --todo:#e3a74a; --good:#5fcf8f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1319; --surface:#161d25; --ink:#e6eaef; --mute:#97a3b1; --line:#27313c;
+  --accent:#6ea4f2; --accent-ink:#0e1319; --reply:#6ea4f2; --cut:#f2867d; --todo:#e3a74a; --good:#5fcf8f; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font);padding-block:24px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+*{box-sizing:border-box}
+main{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1{font-size:26px;margin:0;font-weight:600;letter-spacing:-.01em}
+h2{font-size:17px;margin:0 0 12px;font-weight:600;text-wrap:balance}
+h3{font-size:14px;margin:0 0 8px;font-weight:600}
+p{margin:0}
+small,.mute{color:var(--mute)}
+code,.mono{font-family:var(--mono);font-size:12.5px}
+.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
+.top .sub{max-width:60ch}
+.bar-ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.btn,select,input[type=number]{font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer}
+button.primary,.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:500}
+button:focus-visible,.btn:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input[type=number]{width:70px;cursor:text}
+.btn{position:relative}
+.btn input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.btn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+label.ctl{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mute)}
+.banner{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 14px;font-size:14px}
+.banner.ex{border-color:var(--todo)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile .k{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.tile .v{font:500 28px/1.2 var(--mono);font-variant-numeric:tabular-nums}
+.tile .d{font-size:13px;color:var(--mute)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.chip{border-radius:999px;padding:4px 12px;font-size:13px}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.item{padding:12px 0 12px 12px;border-top:1px solid var(--line);border-left:3px solid var(--mute);display:flex;flex-direction:column;gap:3px;min-width:0}
+.item:first-child{border-top:0}
+.item.needs_reply{border-left-color:var(--reply)}.item.interrupted,.item.unanswered{border-left-color:var(--cut)}.item.unfinished{border-left-color:var(--todo)}
+.item b{overflow-wrap:anywhere}
+.tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;border:1px solid currentColor;border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:1px}
+.tag.stale{color:var(--cut)}.tag.src{color:var(--mute)}
+.quote{color:var(--mute);font-style:italic;overflow-wrap:anywhere}
+.row{display:grid;grid-template-columns:minmax(70px,1.3fr) 2fr minmax(70px,auto);gap:10px;align-items:center;margin:7px 0;font-size:13px}
+.row .l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.track{background:var(--line);border-radius:3px;height:10px}.track i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.row .v{color:var(--mute);text-align:right;font-family:var(--mono);font-size:12px;white-space:nowrap}
+.days{display:flex;align-items:flex-end;gap:3px;height:140px;border-bottom:1px solid var(--line);padding-top:8px}
+.days i{flex:1;min-width:2px;background:var(--accent);border-radius:2px 2px 0 0;min-height:1px}
+.axis{display:flex;justify-content:space-between;font-size:12px;color:var(--mute);margin-top:4px;font-family:var(--mono)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:9px 8px;border-top:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mute);font-weight:500;border-top:0}
+td.n,th.n{text-align:right;white-space:nowrap;font-family:var(--mono)}
+.fix{color:var(--todo);margin-bottom:4px}
+.empty{display:flex;flex-direction:column;gap:14px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.steps ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+ul.tips{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+a{color:var(--accent)}
+.note{font-size:13px;color:var(--mute)}
+[hidden]{display:none!important}
+</style>
+
+<main>
+  <div class="top">
+    <div>
+      <h1>Token Watch</h1>
+      <p class="sub mute">See which chats and projects use the most tokens, and which ones you left waiting. Open it, drop in your latest data, read the result. Everything is processed in this browser only.</p>
+    </div>
+    <div class="bar-ctl">
+      <label class="btn primary" for="f-export">Add claude.ai export<input id="f-export" type="file" accept=".zip,.json,.jsonl" multiple></label>
+      <label class="btn" for="f-folder">Add Claude Code folder<input id="f-folder" type="file" webkitdirectory multiple></label>
+    </div>
+  </div>
+
+  <div id="status" class="banner" hidden></div>
+
+  <section id="empty" class="panel empty" hidden>
+    <h2>Nothing loaded yet</h2>
+    <p>Add your data once a day (or whenever you want a check). The page remembers the last result in this browser, so it opens with yesterday's view.</p>
+    <div class="steps">
+      <div><h3>claude.ai chats and projects</h3>
+        <ol><li>claude.ai, Settings, Privacy, <b>Export data</b>.</li><li>Download the zip from the email.</li><li>Choose <b>Add claude.ai export</b> and pick the zip as it is.</li></ol></div>
+      <div><h3>Claude Code sessions on your PC</h3>
+        <ol><li>Choose <b>Add Claude Code folder</b>.</li><li>Pick <code>C:\Users\&lt;you&gt;\.claude\projects</code>. Paste that path into the file dialog's address bar if you can't see the folder.</li><li>Counts are real token usage from the logs.</li></ol></div>
+    </div>
+    <div class="bar-ctl"><button id="b-example" type="button">Preview with example data</button></div>
+  </section>
+
+  <div id="app" hidden>
+    <div class="bar-ctl" style="margin-bottom:16px">
+      <label class="ctl" for="win">Period
+        <select id="win"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="0">All time</option></select></label>
+      <label class="ctl" for="stale">Mark stale after <input id="stale" type="number" min="1" max="60" value="2"> days idle</label>
+      <button id="b-clear" type="button">Forget saved data</button>
+    </div>
+    <div id="tiles" class="tiles"></div>
+  </div>
+
+  <section id="s-attn" hidden>
+    <h2>Needs your attention</h2>
+    <div class="panel"><div id="chips" class="chips"></div><ul id="attn" class="list"></ul></div>
+  </section>
+
+  <section id="s-daily" hidden>
+    <h2>Token use per day</h2>
+    <div class="panel"><div id="days" class="days" role="img" aria-label="Bar chart of weighted tokens per day"></div><div id="axis" class="axis"></div></div>
+  </section>
+
+  <section id="s-where" hidden>
+    <h2>Where the tokens go</h2>
+    <div class="cols">
+      <div class="panel"><h3>By project</h3><div id="proj"></div></div>
+      <div class="panel" id="p-tools"><h3>Biggest tool outputs (Claude Code)</h3><div id="tools"></div></div>
+      <div class="panel" id="p-models"><h3>By model (Claude Code)</h3><div id="models"></div></div>
+    </div>
+  </section>
+
+  <section id="s-top" hidden>
+    <h2>Most expensive chats and how to cut them</h2>
+    <div class="panel tw"><table id="top"></table></div>
+  </section>
+
+  <section>
+    <h2>Habits that cut usage</h2>
+    <div class="panel"><ul class="tips">
+      <li>One task per chat. Start fresh, or <code>/clear</code>, when the topic changes.</li>
+      <li>Every reply re-reads the whole chat. Long chats cost far more than many short ones; use <code>/compact</code> or paste a short summary into a new chat.</li>
+      <li>Paste only the part of a file or log you need. Big pastes and attachments are re-read on every later reply.</li>
+      <li>Project knowledge files load into every chat in that project. Keep them short and relevant.</li>
+      <li>Use a smaller model (Sonnet or Haiku) for routine edits and questions.</li>
+      <li>Turn off connectors and plugins you are not using. Their tool lists are sent with every message.</li>
+      <li>Answer waiting chats or close them. Coming back after a long pause rebuilds the cache at full price.</li>
+    </ul>
+    <p class="note" style="margin-top:12px">Cost = weighted tokens: fresh input 1, cache write 1.25 to 2, cache read 0.1, output 5. For claude.ai exports the numbers are estimates (characters ÷ 4, each reply re-reading the chat and project knowledge). Use them to rank, not to bill.</p></div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
+var fmt=function(n){return n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(1)+"k":String(Math.round(n))};
+var DAY=864e5, BIG=20000, LONGCTX=150000;
+var QRE=/(\?\s*$|\b(let me know|which (one|option)|would you like|do you want|should i|shall i|please confirm|want me to)\b)/i;
+var INT=/\[Request interrupted/i;
+var KEY="tokenwatch:v1", KEYA="tokenwatch:attn:v1";
+var sessions=[], savedAt=0, isExample=false;
+var filter="all";
+
+function store(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function load(k){try{return JSON.parse(localStorage.getItem(k)||"null")}catch(e){return null}}
+function textOf(c){
+  if(typeof c==="string")return c;
+  if(!Array.isArray(c))return "";
+  return c.map(function(b){return b&&b.type==="text"?(b.text||""):b&&b.type==="tool_result"?textOf(b.content):""}).join("\n");
+}
+function dayKey(ts){return new Date(ts).toISOString().slice(0,10)}
+function short(p){var a=String(p||"").replace(/\\/g,"/").split("/").filter(Boolean);return a.slice(-2).join("/")||p||"(unknown)"}
+
+/* ---------- Claude Code transcript (.jsonl) ---------- */
+function analyzeCode(text,project,fid){
+  var s={source:"code",id:fid,project:project,title:"",lastTs:0,calls:0,out:0,weighted:0,peak:0,sub:0,users:0,
+    models:{},toolChars:{},toolCalls:{},big:[],reread:{},todos:{},daily:{},cwd:"",estimated:false};
+  var usage=new Map(),tools=new Map(),pending=new Set(),last=null,firstUser="";
+  var lines=text.split("\n");
+  for(var i=0;i<lines.length;i++){
+    if(!lines[i])continue;
+    var o;try{o=JSON.parse(lines[i])}catch(e){continue}
+    var t=o.type,ts=o.timestamp?Date.parse(o.timestamp):0;
+    if(ts)s.lastTs=ts;
+    if(o.cwd)s.cwd=o.cwd;
+    if(t==="ai-title"||t==="summary"||t==="custom-title")s.title=o.aiTitle||o.summary||o.customTitle||s.title;
+    var msg=o.message||{},side=!!o.isSidechain;
+    if(t==="assistant"){
+      usage.set(msg.id||o.uuid,[msg.usage||{},msg.model||"?",side,ts]);
+      var bl=Array.isArray(msg.content)?msg.content:[],txt=[],hasTool=false;
+      bl.forEach(function(b){
+        if(b.type==="tool_use"){
+          hasTool=true;var inp=b.input||{};
+          s.toolCalls[b.name]=(s.toolCalls[b.name]||0)+1;
+          tools.set(b.id,[b.name,String(inp.file_path||inp.command||inp.pattern||"")]);pending.add(b.id);
+          if(b.name==="Read"&&inp.file_path)s.reread[inp.file_path]=(s.reread[inp.file_path]||0)+1;
+          if(b.name==="TodoWrite"){s.todos={};(inp.todos||[]).forEach(function(x){s.todos[x.content||""]=x.status||""})}
+          if(b.name==="TaskCreate")s.todos[inp.subject||""]="pending";
+          if(b.name==="TaskUpdate"&&inp.status&&inp.subject&&(inp.subject in s.todos))s.todos[inp.subject]=inp.status;
+        }else if(b.type==="text")txt.push(b.text||"");
+      });
+      if(!side)last=[hasTool?"assistant_tool":"assistant_text",txt.join("\n").trim(),ts];
+    }else if(t==="user"){
+      var c=msg.content,isTR=false;
+      if(Array.isArray(c))c.forEach(function(b){
+        if(b&&b.type==="tool_result"){
+          isTR=true;pending.delete(b.tool_use_id);
+          var n=textOf(b.content).length,nd=tools.get(b.tool_use_id)||["?",""];
+          s.toolChars[nd[0]]=(s.toolChars[nd[0]]||0)+n;
+          if(n>=BIG)s.big.push([nd[0],nd[1].slice(0,80),n]);
+        }});
+      if(!o.isMeta&&!side){
+        var ut=textOf(c).trim();
+        if(ut&&!isTR&&ut.charAt(0)!=="<"){s.users++;firstUser=firstUser||ut;last=["user",ut,ts]}
+        else if(isTR)last=["tool_result","",ts];
+        else if(INT.test(ut))last=["user",ut,ts];
+      }
+    }
+  }
+  usage.forEach(function(v){
+    var u=v[0],cc=u.cache_creation||{},cw1=cc.ephemeral_1h_input_tokens||0,
+      cw5=cc.ephemeral_5m_input_tokens||(cw1?0:(u.cache_creation_input_tokens||0)),
+      i_=u.input_tokens||0,cr=u.cache_read_input_tokens||0,o_=u.output_tokens||0,
+      w=i_+cw5*1.25+cw1*2+cr*0.1+o_*5;
+    s.calls++;s.out+=o_;s.weighted+=w;if(v[2])s.sub+=w;
+    s.models[v[1]]=(s.models[v[1]]||0)+w;
+    s.peak=Math.max(s.peak,i_+cr+cw1+cw5);
+    if(v[3]){var d=dayKey(v[3]);s.daily[d]=(s.daily[d]||0)+w}
+  });
+  s.title=(s.title||firstUser||"(untitled)").replace(/\s+/g," ").slice(0,90);
+  var open=Object.keys(s.todos).filter(function(k){return s.todos[k]==="pending"||s.todos[k]==="in_progress"});
+  s.todosOpen=open.slice(0,8);
+  var kind=last?last[0]:"none",lt=last?last[1]:"",tail=lt.slice(-400);
+  if(kind==="assistant_text"&&QRE.test(tail)&&/\?|let me know|confirm/i.test(tail)){s.status="needs_reply";s.why="Claude asked you something and is waiting for your answer"}
+  else if(kind==="assistant_tool"||pending.size){s.status="interrupted";s.why="Stopped mid-action (a tool call never completed or the session was cut off)"}
+  else if(kind==="tool_result"){s.status="interrupted";s.why="A tool finished but Claude never replied"}
+  else if(kind==="user"){s.status="unanswered";s.why="Your last message got no reply"+(INT.test(lt)?" (you interrupted it)":"")}
+  else if(open.length){s.status="unfinished";s.why=open.length+" to-do item(s) still open"}
+  else{s.status="done";s.why="Last reply was a final answer"}
+  if(open.length&&s.status==="done"){s.status="unfinished";s.why=open.length+" to-do item(s) still open"}
+  s.last=lt.slice(-200).replace(/\s+/g," ");
+  var tips=[];
+  if(s.peak>LONGCTX)tips.push("Context reached "+s.peak.toLocaleString()+" tokens and every turn re-reads it. Run /compact around half full, or /clear when the task changes.");
+  else if(s.calls>60)tips.push(s.calls+" model calls in one chat. Split it into focused sessions.");
+  var seen={},n=0;
+  s.big.sort(function(a,b){return b[2]-a[2]}).forEach(function(b){var k=b[0]+"|"+b[1];if(seen[k]||n>=3)return;seen[k]=1;n++;
+    tips.push(b[0]+" returned "+b[2].toLocaleString()+" chars"+(b[1]?" ("+b[1]+")":"")+". Narrow it with grep, head/tail or line ranges.")});
+  Object.keys(s.reread).filter(function(p){return s.reread[p]>=3}).sort(function(a,b){return s.reread[b]-s.reread[a]}).slice(0,2).forEach(function(p){
+    tips.push(p.split(/[\\/]/).pop()+" was read "+s.reread[p]+" times. Read it once, or put the key facts in CLAUDE.md.")});
+  var top=Object.keys(s.models).sort(function(a,b){return s.models[b]-s.models[a]})[0]||"";
+  if(/opus/.test(top)&&s.users<=3&&s.weighted>200000)tips.push("Opus was used for a short task. Switch to Sonnet or Haiku for routine work (/model).");
+  if(s.weighted&&s.sub/s.weighted>0.4)tips.push("Over 40% of the cost is in sub-agents. Use them only for broad searches with tight scope.");
+  s.tips=tips;s.link="";
+  return s;
+}
+
+/* ---------- claude.ai export ---------- */
+function msgText(m){
+  var best=m.text||"";
+  (m.content||[]).forEach(function(b){if(b&&b.type==="text"&&(b.text||"").length>best.length)best=b.text});
+  return best;
+}
+function attChars(m){var n=0;(m.attachments||[]).forEach(function(a){n+=(a.extracted_content||"").length});return n}
+function analyzeChats(convs,projects){
+  var pname={},pdocs={};
+  projects.forEach(function(p){
+    pname[p.uuid]=p.name||"(unnamed project)";
+    pdocs[p.uuid]=(p.docs||[]).reduce(function(a,d){return a+(d.content||"").length},0)+(p.prompt_template||"").length;
+  });
+  var out=[];
+  convs.forEach(function(c){
+    var ms=c.chat_messages||[];if(!ms.length)return;
+    var puid=c.project_uuid||(c.project&&c.project.uuid),
+      proj=pname[puid]||(c.project&&c.project.name)||"(no project)",kb=(pdocs[puid]||0)/4;
+    var ctx=kb,processed=0,outTok=0,calls=0,peak=0,big=[],users=0,daily={};
+    ms.forEach(function(m){
+      var ac=attChars(m),tok=(msgText(m).length+ac)/4;
+      if(ac>=BIG)big.push([((m.attachments||[])[0]||{}).file_name||"",ac]);
+      if(m.sender==="human"){users++;ctx+=tok}
+      else{calls++;var before=ctx;processed+=ctx;outTok+=tok;ctx+=tok;peak=Math.max(peak,ctx);
+        var ts=Date.parse(m.created_at||c.updated_at||"");
+        if(ts){var d=dayKey(ts);daily[d]=(daily[d]||0)+before+tok*5}}
+    });
+    var lm=ms[ms.length-1],lt=msgText(lm).trim(),lastTs=Date.parse(lm.created_at||c.updated_at||"")||0;
+    var s={source:"chat",id:c.uuid||"?",project:proj,title:((c.name||"").trim()||msgText(ms[0]).trim()||"(untitled)").replace(/\s+/g," ").slice(0,90),
+      lastTs:lastTs,calls:calls,out:Math.round(outTok),weighted:processed+outTok*5,peak:Math.round(peak),sub:0,users:users,
+      models:{},toolChars:{},toolCalls:{},big:[],reread:{},todos:{},todosOpen:[],daily:daily,estimated:true};
+    if(lm.sender==="human"){s.status="unanswered";s.why="Your last message got no reply"}
+    else if(QRE.test(lt.slice(-400))){s.status="needs_reply";s.why="Claude asked you something and is waiting for your answer"}
+    else{s.status="done";s.why="Last reply was a final answer"}
+    s.last=lt.slice(-200).replace(/\s+/g," ");
+    var tips=[];
+    if(calls>30)tips.push(calls+" replies in one chat, and each re-reads the whole history. Start a new chat per task and paste a short summary.");
+    if(kb>20000)tips.push("Project \""+proj+"\" carries about "+Math.round(kb/1000)+"k tokens of knowledge into every reply. Trim the docs or move rarely used ones out.");
+    big.sort(function(a,b){return b[1]-a[1]}).slice(0,3).forEach(function(b){tips.push("Large attachment or paste ("+b[1].toLocaleString()+" chars"+(b[0]?", "+b[0]:"")+") stays in context for every later reply. Paste only the part you need.")});
+    if(peak>100000)tips.push("The conversation reached about "+Math.round(peak/1000)+"k tokens. Summarise it and restart.");
+    s.tips=tips;s.link="https://claude.ai/chat/"+s.id;
+    out.push(s);
+  });
+  return out;
+}
+
+/* ---------- loading files ---------- */
+function setStatus(msg,cls){var b=$("status");b.hidden=!msg;b.textContent=msg||"";b.className="banner"+(cls?" "+cls:"")}
+function tick(){return new Promise(function(r){setTimeout(r,0)})}
+async function ingest(files){
+  var convs=[],projs=[],code=[],bad=0;
+  try{
+    for(var i=0;i<files.length;i++){
+      var f=files[i],name=f.name.toLowerCase(),rel=(f.webkitRelativePath||f.name).replace(/\\/g,"/");
+      setStatus("Reading "+(i+1)+" of "+files.length+": "+f.name+" …");await tick();
+      if(name.endsWith(".zip")){
+        if(!window.JSZip){setStatus("The zip reader could not load. Unzip the export and add conversations.json and projects.json instead.","ex");return}
+        var z=await JSZip.loadAsync(f);
+        var names=Object.keys(z.files);
+        for(var j=0;j<names.length;j++){
+          var b=names[j].split("/").pop().toLowerCase();
+          if(b==="conversations.json"||b==="projects.json"){
+            var d=JSON.parse(await z.files[names[j]].async("string"));
+            if(!Array.isArray(d))d=d.conversations||d.projects||[];
+            (b==="projects.json"?projs:convs).push.apply(b==="projects.json"?projs:convs,d);
+          }}
+      }else if(name==="conversations.json"||name==="projects.json"){
+        var d2=JSON.parse(await f.text());
+        if(!Array.isArray(d2))d2=d2.conversations||d2.projects||[];
+        (name==="projects.json"?projs:convs).push.apply(name==="projects.json"?projs:convs,d2);
+      }else if(name.endsWith(".jsonl")&&rel.indexOf("/subagents/")<0){
+        var parts=rel.split("/"),proj=parts.length>1?parts[parts.length-2]:"(unknown)";
+        var sObj=analyzeCode(await f.text(),proj,f.name.replace(/\.jsonl$/,""));
+        if(sObj.cwd)sObj.project=short(sObj.cwd);
+        if(sObj.calls||sObj.users)code.push(sObj);
+      }else bad++;
+    }
+  }catch(e){setStatus("Could not read that file: "+e.message+". If this is a claude.ai export, tell Claude which step failed.","ex");return}
+  var fresh=code.concat(analyzeChats(convs,projs));
+  if(!fresh.length){setStatus("No chats found in those files. Pick the export zip, or the .claude/projects folder."+(bad?" ("+bad+" other file(s) ignored.)":""),"ex");return}
+  var prev=load(KEYA),prevIds=prev?prev.ids:null;
+  if(isExample){sessions=[];isExample=false}
+  var keys={};fresh.forEach(function(s){keys[s.source+s.id]=1});
+  sessions=sessions.filter(function(s){return !keys[s.source+s.id]}).concat(fresh);
+  savedAt=Date.now();store(KEY,{savedAt:savedAt,sessions:sessions});
+  var ids=attention().map(function(s){return s.source+s.id});
+  store(KEYA,{ids:ids,at:savedAt});
+  var msg="Loaded "+fresh.length+" chat(s) at "+new Date(savedAt).toLocaleString()+".";
+  if(prevIds){var ps={};prevIds.forEach(function(x){ps[x]=1});var cs={};ids.forEach(function(x){cs[x]=1});
+    var nw=ids.filter(function(x){return !ps[x]}).length,rs=prevIds.filter(function(x){return !cs[x]}).length;
+    msg+=" Since your last check: "+nw+" new item(s) need attention, "+rs+" resolved."}
+  setStatus(msg);render();
+}
+
+/* ---------- derived views ---------- */
+function win(){var d=+$("win").value;return d?Date.now()-d*DAY:0}
+function inWin(){var c=win();return sessions.filter(function(s){return !c||s.lastTs>=c})}
+function idle(s){return s.lastTs?(Date.now()-s.lastTs)/DAY:0}
+function isStale(s){return s.status!=="done"&&idle(s)>=(+$("stale").value||2)}
+function attention(){return (isExampleOrLoaded()?inWin():[]).filter(function(s){return s.status!=="done"})}
+function isExampleOrLoaded(){return sessions.length>0}
+function bars(rows){
+  var mx=Math.max.apply(null,rows.map(function(r){return r[1]}).concat([1]));
+  return rows.map(function(r){return '<div class="row"><span class="l" title="'+esc(r[0])+'">'+esc(r[0])+'</span><span class="track"><i style="width:'+(r[1]/mx*100).toFixed(1)+'%"></i></span><span class="v">'+esc(r[2])+'</span></div>'}).join("")||'<p class="mute">No data in this period.</p>';
+}
+var LABEL={needs_reply:"Waiting for your reply",interrupted:"Cut off mid-task",unanswered:"Your message got no answer",unfinished:"Open to-dos"};
+
+function render(){
+  var has=sessions.length>0;
+  $("empty").hidden=has;$("app").hidden=!has;
+  ["s-attn","s-daily","s-where","s-top"].forEach(function(id){$(id).hidden=!has});
+  if(!has){setStatus("");return}
+  var list=inWin(),total=list.reduce(function(a,s){return a+s.weighted},0),at=list.filter(function(s){return s.status!=="done"}),
+    stale=at.filter(isStale),est=list.some(function(s){return s.estimated});
+  $("tiles").innerHTML=[
+    ["Chats in period",String(list.length),"across "+new Set(list.map(function(s){return s.project})).size+" project(s)"],
+    ["Weighted tokens",fmt(total),est?"includes estimates for claude.ai chats":"from real usage logs"],
+    ["Need attention",String(at.length),"waiting, cut off, unanswered or open to-dos"],
+    ["Stale",String(stale.length),"idle "+($("stale").value||2)+"+ days and still open"]
+  ].map(function(t){return '<div class="tile"><span class="k">'+t[0]+'</span><span class="v">'+t[1]+'</span><span class="d">'+t[2]+'</span></div>'}).join("");
+
+  var counts={all:at.length};at.forEach(function(s){counts[s.status]=(counts[s.status]||0)+1});
+  var chips=[["all","All"]].concat(Object.keys(LABEL).map(function(k){return [k,LABEL[k]]})).filter(function(c){return c[0]==="all"||counts[c[0]]});
+  $("chips").innerHTML=chips.map(function(c){return '<button type="button" class="chip" data-f="'+c[0]+'" aria-pressed="'+(filter===c[0])+'">'+esc(c[1])+" "+(counts[c[0]]||0)+"</button>"}).join("");
+  var shown=at.filter(function(s){return filter==="all"||s.status===filter}).sort(function(a,b){return isStale(b)-isStale(a)||idle(a)-idle(b)});
+  $("attn").innerHTML=shown.map(function(s){
+    return '<li class="item '+s.status+'"><span><b>'+esc(s.title)+'</b>'+(isStale(s)?'<span class="tag stale">Stale</span>':"")+'<span class="tag src">'+(s.source==="chat"?"claude.ai":"Claude Code")+'</span></span>'+
+      '<small>'+esc(LABEL[s.status])+" · idle "+idle(s).toFixed(1)+" days · "+esc(s.project)+'</small><span>'+esc(s.why)+'</span>'+
+      (s.last?'<span class="quote">“'+esc(s.last.slice(0,160))+'”</span>':"")+
+      (s.todosOpen&&s.todosOpen.length?s.todosOpen.map(function(t){return '<small>☐ '+esc(t)+'</small>'}).join(""):"")+
+      (s.link?'<a href="'+esc(s.link)+'" target="_blank" rel="noopener">Open this chat</a>':'<code>claude --resume '+esc(s.id)+'</code>')+'</li>';
+  }).join("")||'<li class="item"><span>Nothing is waiting. Every chat in this period ended with a final answer.</span></li>';
+
+  var span=+$("win").value||30,days=[],now=Date.now(),agg={};
+  list.forEach(function(s){Object.keys(s.daily||{}).forEach(function(d){agg[d]=(agg[d]||0)+s.daily[d]})});
+  for(var i=Math.min(span,60)-1;i>=0;i--){var k=dayKey(now-i*DAY);days.push([k,agg[k]||0])}
+  var mx=Math.max.apply(null,days.map(function(d){return d[1]}).concat([1]));
+  $("days").innerHTML=days.map(function(d){return '<i title="'+d[0]+": "+fmt(d[1])+' tokens" style="height:'+(d[1]/mx*100).toFixed(1)+'%"></i>'}).join("");
+  $("axis").innerHTML="<span>"+days[0][0]+"</span><span>peak "+fmt(mx)+"</span><span>"+days[days.length-1][0]+"</span>";
+
+  var pj={};list.forEach(function(s){var p=pj[s.project]||(pj[s.project]={w:0,n:0});p.w+=s.weighted;p.n++});
+  $("proj").innerHTML=bars(Object.keys(pj).sort(function(a,b){return pj[b].w-pj[a].w}).slice(0,10).map(function(k){return [k,pj[k].w,fmt(pj[k].w)+" · "+(pj[k].w/(total||1)*100).toFixed(0)+"% · "+pj[k].n]}));
+  var tc={},tn={},md={};list.forEach(function(s){Object.keys(s.toolChars||{}).forEach(function(k){tc[k]=(tc[k]||0)+s.toolChars[k]});Object.keys(s.toolCalls||{}).forEach(function(k){tn[k]=(tn[k]||0)+s.toolCalls[k]});
+    if(!s.estimated)Object.keys(s.models||{}).forEach(function(k){md[k]=(md[k]||0)+s.models[k]})});
+  var tk=Object.keys(tc).sort(function(a,b){return tc[b]-tc[a]}).slice(0,8);
+  $("p-tools").hidden=!tk.length;$("tools").innerHTML=bars(tk.map(function(k){return [k,tc[k],fmt(tc[k]/4)+" tok · "+(tn[k]||0)+" calls"]}));
+  var mk=Object.keys(md).sort(function(a,b){return md[b]-md[a]});
+  $("p-models").hidden=!mk.length;$("models").innerHTML=bars(mk.map(function(k){return [k,md[k],(md[k]/(Object.keys(md).reduce(function(a,x){return a+md[x]},0)||1)*100).toFixed(0)+"%"]}));
+
+  var top=list.slice().sort(function(a,b){return b.weighted-a.weighted}).slice(0,12);
+  $("top").innerHTML='<tr><th>Chat</th><th class="n">Cost</th><th class="n">Replies</th><th class="n">Peak context</th><th>What to change</th></tr>'+top.map(function(s){
+    return '<tr><td>'+esc(s.title)+'<br><small>'+esc(s.project)+(s.estimated?" · estimate":"")+'</small></td><td class="n">'+fmt(s.weighted)+'</td><td class="n">'+s.calls+'</td><td class="n">'+fmt(s.peak)+'</td><td>'+
+      (s.tips.map(function(t){return '<div class="fix">'+esc(t)+'</div>'}).join("")||'<small>Looks efficient.</small>')+'</td></tr>'}).join("");
+}
+
+/* ---------- example data ---------- */
+function exampleData(){
+  var n=Date.now(),mk=function(o){return Object.assign({calls:10,out:2000,sub:0,users:4,models:{},toolChars:{},toolCalls:{},big:[],reread:{},todos:{},todosOpen:[],daily:{},tips:[],link:"",last:"",estimated:false,peak:60000},o)};
+  var d=function(i,w){var x={};x[dayKey(n-i*DAY)]=w;return x};
+  return [
+    mk({source:"code",id:"ex-1",project:"web-store",title:"Refactor checkout flow",weighted:2400000,calls:140,peak:210000,lastTs:n-.2*DAY,status:"interrupted",why:"Stopped mid-action (a tool call never completed or the session was cut off)",last:"Updating the payment handler…",
+      models:{"claude-opus-5-5":2400000},toolChars:{Read:310000,Bash:90000},toolCalls:{Read:60,Bash:44},daily:Object.assign(d(0,900000),d(1,1500000)),
+      tips:["Context reached 210,000 tokens and every turn re-reads it. Run /compact around half full, or /clear when the task changes.","Read returned 42,000 chars (src/checkout.ts). Narrow it with grep, head/tail or line ranges."]}),
+    mk({source:"chat",id:"ex-2",project:"Thesis",title:"Literature review draft",weighted:1700000,calls:48,peak:95000,lastTs:n-6*DAY,status:"needs_reply",why:"Claude asked you something and is waiting for your answer",last:"Do you want me to add the 2024 studies as well?",link:"https://claude.ai/chat/example",estimated:true,daily:Object.assign(d(6,1700000)),
+      tips:["48 replies in one chat, and each re-reads the whole history. Start a new chat per task and paste a short summary.","Project \"Thesis\" carries about 38k tokens of knowledge into every reply. Trim the docs or move rarely used ones out."]}),
+    mk({source:"chat",id:"ex-3",project:"(no project)",title:"Rewrite my resume",weighted:9000,calls:1,lastTs:n-4*DAY,status:"unanswered",why:"Your last message got no reply",last:"rewrite my resume for a product role",link:"https://claude.ai/chat/example",estimated:true,daily:d(4,9000)}),
+    mk({source:"code",id:"ex-4",project:"web-store",title:"Add unit tests",weighted:380000,calls:22,lastTs:n-1*DAY,status:"unfinished",why:"2 to-do item(s) still open",todosOpen:["Cover refund path","Run full suite"],daily:d(1,380000),models:{"claude-sonnet-5-5":380000},toolChars:{Bash:40000},toolCalls:{Bash:12}}),
+    mk({source:"code",id:"ex-5",project:"notes-api",title:"Fix date parsing bug",weighted:120000,calls:8,lastTs:n-2*DAY,status:"done",why:"Last reply was a final answer",daily:d(2,120000),models:{"claude-sonnet-5-5":120000}})
+  ];
+}
+
+/* ---------- wiring ---------- */
+$("f-export").addEventListener("change",function(e){var f=Array.prototype.slice.call(e.target.files);e.target.value="";if(f.length)ingest(f)});
+$("f-folder").addEventListener("change",function(e){var f=Array.prototype.slice.call(e.target.files);e.target.value="";if(f.length)ingest(f)});
+$("b-example").addEventListener("click",function(){sessions=exampleData();isExample=true;setStatus("Example data. These chats are made up to show the layout. Add your own data to replace them.","ex");render()});
+$("b-clear").addEventListener("click",function(){try{localStorage.removeItem(KEY);localStorage.removeItem(KEYA)}catch(e){}sessions=[];isExample=false;setStatus("");render()});
+$("win").addEventListener("change",render);$("stale").addEventListener("input",render);
+$("chips").addEventListener("click",function(e){var b=e.target.closest("button[data-f]");if(b){filter=b.getAttribute("data-f");render()}});
+
+var saved=load(KEY);
+if(saved&&Array.isArray(saved.sessions)&&saved.sessions.length){
+  sessions=saved.sessions;savedAt=saved.savedAt;
+  setStatus("Showing the data you added on "+new Date(savedAt).toLocaleString()+". Add fresh data to update it.");
+}
+render();
+})();
+</script>
+</body></html>

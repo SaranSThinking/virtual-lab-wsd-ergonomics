@@ -39,3 +39,9 @@ start chats.html
 Exports have no token counts, so figures are **estimates** (characters / 4, with every reply re-reading the whole chat plus the
 project's knowledge files). Use them to rank chats and projects, not to bill. Unfinished chats (waiting on your reply, or your
 last message unanswered) are listed with a direct chat link.
+
+## Daily dashboard (no install)
+
+`tools/token-watch.html` is the same audit as a browser page. Open it, choose the claude.ai export zip and/or your
+`.claude/projects` folder, and read the result. It runs entirely in the browser, remembers the last result, and shows what is new or
+resolved since your last check. Also published as an Artifact (see the session).
