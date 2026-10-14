@@ -14,3 +14,14 @@ python3 tools/token_audit.py --days 0 --stale-days 3 --json audit.json
 
 No dependencies (Python 3.8+). Reads local files only. Run it with `--root` to point at another transcript folder.
 Cloud-session transcripts live inside each container, so run it where the sessions ran, or copy the `.jsonl` files over.
+
+## Windows (PowerShell)
+
+```
+git clone -b claude/gallant-archimedes-rtjmjg https://github.com/saransthinking/virtual-lab-wsd-ergonomics.git
+cd virtual-lab-wsd-ergonomics
+py tools\token_audit.py --html audit.html
+start audit.html
+```
+
+Install Python from python.org (tick "Add python.exe to PATH") if `py` is not found. Use `py`, not `python3`.

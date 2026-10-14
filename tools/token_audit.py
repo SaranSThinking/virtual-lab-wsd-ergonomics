@@ -63,7 +63,7 @@ def analyze_session(path, now, stale_days):
     pending_tool = {}      # tool_use ids not yet answered
     first_user = ""
 
-    for line in open(path, errors="replace"):
+    for line in open(path, encoding="utf-8", errors="replace"):
         try:
             o = json.loads(line)
         except Exception:
@@ -355,16 +355,18 @@ def main():
     ap.add_argument("--stale-days", type=float, default=2, help="unfinished chat idle this long is flagged STALE")
     ap.add_argument("--html"); ap.add_argument("--json")
     a = ap.parse_args()
+    if hasattr(sys.stdout, "reconfigure"):   # Windows consoles default to cp1252
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sessions = collect(a.root, a.days, a.stale_days)
     if not sessions:
         sys.exit(f"No transcripts found under {a.root}")
     terminal(sessions, a.stale_days)
     if a.html:
-        Path(a.html).write_text(html_report(sessions, a.stale_days)); print(f"\nHTML dashboard: {a.html}")
+        Path(a.html).write_text(html_report(sessions, a.stale_days), encoding="utf-8"); print(f"\nHTML dashboard: {a.html}")
     if a.json:
         def enc(o):
             return o.isoformat() if isinstance(o, dt.datetime) else dict(o) if isinstance(o, collections.Counter) else str(o)
-        Path(a.json).write_text(json.dumps(sessions, default=enc, indent=1)); print(f"JSON: {a.json}")
+        Path(a.json).write_text(json.dumps(sessions, default=enc, indent=1), encoding="utf-8"); print(f"JSON: {a.json}")
 
 
 if __name__ == "__main__":
