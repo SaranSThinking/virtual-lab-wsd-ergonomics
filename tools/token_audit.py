@@ -218,6 +218,105 @@ def collect(root, days, stale_days):
     return sessions
 
 
+
+# ---------------------------------------------------------------- claude.ai data export
+def _load_export(path):
+    """Return (conversations, projects) from an export folder, zip, or conversations.json."""
+    import zipfile
+    path = Path(path).expanduser()
+    found = {}
+    def pick(name, data):
+        base = os.path.basename(name).lower()
+        if base in ("conversations.json", "projects.json"):
+            found[base] = json.loads(data.decode("utf-8", "replace") if isinstance(data, bytes) else data)
+    if path.is_file() and path.suffix.lower() == ".zip":
+        with zipfile.ZipFile(path) as z:
+            for n in z.namelist():
+                pick(n, z.read(n))
+    elif path.is_file():
+        pick(path.name, path.read_bytes())
+        for sib in ("conversations.json", "projects.json"):
+            f = path.parent / sib
+            if f.exists() and sib not in found:
+                pick(sib, f.read_bytes())
+    else:
+        for f in path.rglob("*.json"):
+            pick(f.name, f.read_bytes())
+    unwrap = lambda x, k: x.get(k, []) if isinstance(x, dict) else (x or [])
+    return unwrap(found.get("conversations.json"), "conversations"), unwrap(found.get("projects.json"), "projects")
+
+
+def _msg_text(m):
+    parts = [m.get("text") or ""]
+    for b in m.get("content") or []:
+        if isinstance(b, dict) and b.get("type") == "text" and b.get("text") not in parts:
+            parts.append(b.get("text") or "")
+    return max(parts, key=len)
+
+
+def _att_chars(m):
+    n = 0
+    for a in (m.get("attachments") or []):
+        n += len(a.get("extracted_content") or "")
+    return n
+
+
+def analyze_export(path, now, stale_days):
+    convs, projects = _load_export(path)
+    pname, pdocs = {}, {}
+    for pr in projects:
+        pname[pr.get("uuid")] = pr.get("name") or "(unnamed project)"
+        pdocs[pr.get("uuid")] = sum(len(d.get("content") or "") for d in pr.get("docs", []) or []) + len(pr.get("prompt_template") or "")
+    sessions = []
+    for c in convs:
+        msgs = c.get("chat_messages") or []
+        if not msgs:
+            continue
+        puid = c.get("project_uuid") or (c.get("project") or {}).get("uuid")
+        proj = pname.get(puid) or (c.get("project") or {}).get("name") or "(no project)"
+        kb = pdocs.get(puid, 0) / 4
+        ctx = kb; processed = 0.0; out = 0.0; calls = 0; peak = 0; big = []; users = 0
+        for m in msgs:
+            chars = len(_msg_text(m)) + _att_chars(m)
+            tok = chars / 4
+            if _att_chars(m) >= BIG_RESULT_CHARS:
+                big.append(("Attachment/paste", (m.get("attachments") or [{}])[0].get("file_name", "")[:60], _att_chars(m)))
+            if m.get("sender") == "human":
+                users += 1; ctx += tok
+            else:
+                calls += 1; processed += ctx; out += tok; ctx += tok; peak = max(peak, ctx)
+        first = parse_ts(c.get("created_at", "")); last = parse_ts(msgs[-1].get("created_at") or c.get("updated_at", ""))
+        idle = (now - last).total_seconds() / 86400 if last else 0
+        lm = msgs[-1]; ltxt = _msg_text(lm).strip()
+        if lm.get("sender") == "human":
+            status, why = "unanswered", "Your last message got no reply"
+        elif QUESTION_RE.search(ltxt[-400:]):
+            status, why = "needs_reply", "Claude asked you something and is waiting for your answer"
+        else:
+            status, why = "done", "Last reply was a final answer"
+        tips = []
+        if calls > 30:
+            tips.append(f"{calls} replies in one chat; each re-reads the whole history. Start a new chat per task and paste a short summary.")
+        if kb > 20_000:
+            tips.append(f"Project '{proj}' carries ~{kb/1000:.0f}k tokens of knowledge into every reply. Trim docs or move rarely-used ones out.")
+        for n_, d_, ch in big[:3]:
+            tips.append(f"Large attachment/paste ({ch:,} chars{', ' + d_ if d_ else ''}) stays in context for every later reply. Paste only the needed part.")
+        if peak > 100_000:
+            tips.append(f"Conversation reached ~{peak/1000:.0f}k tokens. Summarise and restart.")
+        sessions.append(dict(
+            id=c.get("uuid", "?"), project=proj, path="", title=((c.get("name") or "").strip() or _msg_text(msgs[0]).strip() or "(untitled)").replace("\n", " ")[:90],
+            first_ts=first, last_ts=last, calls=calls, in_=int(processed), cw=0, cr=0, out=int(out),
+            weighted=processed + out * W_OUT, peak_ctx=int(peak), sub_weighted=0.0, models=collections.Counter({c.get("model") or "claude.ai": processed + out * W_OUT}),
+            tool_chars=collections.Counter(), tool_calls=collections.Counter(), big_results=big, rereads=collections.Counter(),
+            open_todos=[], cwd="", user_msgs=users, idle_days=idle, status=status, status_why=why,
+            last_text=ltxt[-200:].replace("\n", " "), stale=status != "done" and idle >= stale_days, tips=tips, estimated=True))
+    return sessions
+
+
+def resume_hint(s):
+    return f"https://claude.ai/chat/{s['id']}" if s.get("estimated") else f"claude --resume {s['id']}"
+
+
 _LABELS = {}
 
 
@@ -272,7 +371,7 @@ def terminal(sessions, stale_days):
             print(f"      {s['status_why']}" + (f"; last: \"{s['last_text'][:100]}\"" if s["last_text"] else ""))
             for t in s["open_todos"][:5]:
                 print(f"      [ ] {t}")
-            print(f"      resume: claude --resume {s['id']}")
+            print(f"      resume: {resume_hint(s)}")
     print("\n-- General ways to cut usage --")
     for g in GENERAL_TIPS:
         print(f"  * {g}")
@@ -316,7 +415,7 @@ def html_report(sessions, stale_days):
             f'<br><small>{s["idle_days"]:.1f}d idle · {e(pretty_project(s["project"]))}</small><br>{e(s["status_why"])}'
             + (f'<br><small class="last">“{e(s["last_text"][:140])}”</small>' if s["last_text"] else "")
             + "".join(f"<br><small>☐ {e(t)}</small>" for t in s["open_todos"][:5])
-            + f'<br><code>claude --resume {e(s["id"])}</code></li>' for s in grp)
+            + f'<br><code>{e(resume_hint(s))}</code></li>' for s in grp)
         cards += f'<section><h3>{label} <span class="count">{len(grp)}</span></h3><ul>{items or "<li class=none>None</li>"}</ul></section>'
     tips = "".join(f"<li>{e(g)}</li>" for g in GENERAL_TIPS)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -353,13 +452,21 @@ def main():
     ap.add_argument("--root", default="~/.claude/projects")
     ap.add_argument("--days", type=int, default=30, help="only chats touched in last N days (0 = all)")
     ap.add_argument("--stale-days", type=float, default=2, help="unfinished chat idle this long is flagged STALE")
+    ap.add_argument("--export", help="claude.ai data export: folder, .zip, or conversations.json (estimates tokens from text)")
     ap.add_argument("--html"); ap.add_argument("--json")
     a = ap.parse_args()
     if hasattr(sys.stdout, "reconfigure"):   # Windows consoles default to cp1252
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    sessions = collect(a.root, a.days, a.stale_days)
+    if a.export:
+        now = dt.datetime.now(dt.timezone.utc)
+        sessions = analyze_export(a.export, now, a.stale_days)
+        if a.days:
+            sessions = [x for x in sessions if x["last_ts"] and (now - x["last_ts"]).days <= a.days]
+        print("NOTE: claude.ai exports have no token counts. Figures are ESTIMATES (chars/4; every reply re-reads the chat + project knowledge).")
+    else:
+        sessions = collect(a.root, a.days, a.stale_days)
     if not sessions:
-        sys.exit(f"No transcripts found under {a.root}")
+        sys.exit("No conversations found in the export" if a.export else f"No transcripts found under {a.root}")
     terminal(sessions, a.stale_days)
     if a.html:
         Path(a.html).write_text(html_report(sessions, a.stale_days), encoding="utf-8"); print(f"\nHTML dashboard: {a.html}")

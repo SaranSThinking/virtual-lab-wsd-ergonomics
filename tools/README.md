@@ -25,3 +25,17 @@ start audit.html
 ```
 
 Install Python from python.org (tick "Add python.exe to PATH") if `py` is not found. Use `py`, not `python3`.
+
+## claude.ai chats and projects (all conversations)
+
+1. claude.ai -> Settings -> Privacy -> **Export data**. Wait for the email, download the zip.
+2. Run on the zip (no need to unzip):
+
+```
+py tools\token_audit.py --export "C:\Users\You\Downloads\data-xxxx.zip" --days 0 --html chats.html
+start chats.html
+```
+
+Exports have no token counts, so figures are **estimates** (characters / 4, with every reply re-reading the whole chat plus the
+project's knowledge files). Use them to rank chats and projects, not to bill. Unfinished chats (waiting on your reply, or your
+last message unanswered) are listed with a direct chat link.
